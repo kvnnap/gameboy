@@ -6,6 +6,7 @@
 #include <stdexcept>
 
 #include "Cartridge.h"
+#include "MBCFactory.h"
 
 using namespace std;
 using namespace Gameboy::Cartridge;
@@ -35,13 +36,24 @@ void Cartridge::load(const std::string &romPath) {
 
     // Initialise this Rom with the loaded data from file
     rom.initialise(memory);
+
+    // Initialise ram
+    memory.resize(rom.getNumRamBanks() * 8192);
+    ram.initialise(memory);
+
+    // Initialise MBC
+    mbc = MBCFactory(rom, ram).make(rom.getCartridgeTypeAsString());
 }
 
 const Rom &Cartridge::getRom() const {
     return rom;
 }
 
+const Ram &Cartridge::getRam() const {
+    return ram;
+}
+
 ostream& ::Gameboy::Cartridge::operator<<(std::ostream &strm, const Cartridge &cartridge) {
-    strm << "Cartridge: " << endl << " Rom: " << cartridge.getRom();
+    strm << "Cartridge: " << endl << cartridge.getRom() << endl << "Ram size: " << cartridge.getRam().getSize() << endl;
     return strm;
 }

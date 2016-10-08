@@ -6,13 +6,17 @@
 #define GAMEBOY_CARTRIDGE_H
 
 #include <ostream>
+#include <memory>
+
 #include "Rom.h"
+#include "Memory/ReadableWritableMemory.h"
+#include "MemoryBankController.h"
 
 namespace Gameboy {
 
     namespace Cartridge {
 
-
+        using Ram = Memory::ReadableWritableMemory;
 
         // Cartridge contains
         // -- Rom
@@ -25,8 +29,11 @@ namespace Gameboy {
             void load(const std::string &romPath);
 
             const Rom& getRom() const;
+            const Ram& getRam() const;
         private:
             Rom rom;
+            Ram ram;
+            std::unique_ptr<MemoryBankController> mbc;
         };
 
         std::ostream &operator<<(std::ostream &strm, const Cartridge &cartridge);
