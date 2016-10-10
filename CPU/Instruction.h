@@ -16,9 +16,10 @@ namespace Gameboy {
             //std::uint8_t opcode;
             std::uint8_t length;
             std::uint8_t cycles;
+            std::uint8_t cyclesNoAction;
             std::uint8_t destRegIndex;
             std::uint8_t srcRegIndex;
-            void (CPU::*execfn)(const Instruction& instruction);
+            std::uint8_t (CPU::*execfn)(const Instruction& instruction);
         };
     }
 }
