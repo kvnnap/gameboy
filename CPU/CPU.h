@@ -84,6 +84,62 @@ namespace Gameboy {
             uint8_t dec_regpt(const Instruction &instruction);
 
             void incdec8_flags(uint8_t valueAfter, bool isSubtract);
+
+            uint8_t load_d8_to_regpt(const Instruction &instruction);
+
+            uint8_t set_carryflag(const Instruction &instruction);
+
+            uint8_t load_regptdec_to_reg8(const Instruction &instruction);
+
+            uint8_t cpl_carryflag(const Instruction &instruction);
+
+            uint8_t load_reg8_to_reg8(const Instruction &instruction);
+
+            uint8_t halt(const Instruction &instruction);
+
+            void add_val8_to_reg8_nc_c(std::uint8_t destRegIndex, std::uint8_t srcValue, bool carry);
+
+            uint8_t add_reg8_to_reg8(const Instruction &instruction);
+
+            uint8_t add_reg8_to_reg8_c(const Instruction &instruction);
+
+            uint8_t add_regpt_to_reg8(const Instruction &instruction);
+
+            uint8_t add_regpt_to_reg8_c(const Instruction &instruction);
+
+            void dec_val8_from_reg8_nc_c(std::uint8_t destRegIndex, std::uint8_t srcValue, bool carry);
+
+            uint8_t sub_reg8_from_reg8(const Instruction &instruction);
+
+            uint8_t sub_reg8_from_reg8_c(const Instruction &instruction);
+
+            uint8_t sub_regpt_from_reg8(const Instruction &instruction);
+
+            uint8_t sub_regpt_from_reg8_c(const Instruction &instruction);
+
+            uint8_t and_reg8_to_reg8(const Instruction &instruction);
+
+            uint8_t and_regpt_to_reg8(const Instruction &instruction);
+
+            void and_val8_to_reg8(uint8_t destRegIndex, uint8_t srcValue);
+
+            void xor_val8_to_reg8(uint8_t destRegIndex, uint8_t srcValue);
+
+            uint8_t xor_reg8_to_reg8(const Instruction &instruction);
+
+            uint8_t xor_regpt_to_reg8(const Instruction &instruction);
+
+            void or_val8_to_reg8(uint8_t destRegIndex, uint8_t srcValue);
+
+            uint8_t or_reg8_to_reg8(const Instruction &instruction);
+
+            uint8_t or_regpt_to_reg8(const Instruction &instruction);
+
+            void cp_val8_to_reg8(uint8_t destRegIndex, uint8_t srcValue);
+
+            uint8_t cp_reg8_to_reg8(const Instruction &instruction);
+
+            uint8_t cp_regpt_to_reg8(const Instruction &instruction);
         };
     }
 }

@@ -31,8 +31,8 @@ namespace Gameboy {
         };
 
         enum FlagRegister : std::uint8_t {
-            Carry = (1 << 4),
-            HalfCarry = (1 << 5),
+            CarryFlag = (1 << 4),
+            HalfCarryFlag = (1 << 5),
             SubtractFlag = (1 << 6),
             ZeroFlag = (1 << 7)
         };
