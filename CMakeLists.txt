@@ -18,6 +18,7 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -std=c++11")
 # Find all source files in the below directory automatically
 file(GLOB_RECURSE SOURCE_FILES
      Cartridge/*.cpp
+     CPU/*.cpp
      General/*.cpp
      Memory/*.cpp
 )

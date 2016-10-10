@@ -21,6 +21,7 @@ namespace Gameboy {
 
             MemoryBankController(const Rom& p_rom, Ram& p_ram);
 
+            // 8-bit R/W
             std::uint8_t read(std::uint16_t address) const override;
             void write(std::uint16_t address, std::uint8_t datum) override;
 
