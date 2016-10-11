@@ -10,8 +10,7 @@ using namespace std;
 using namespace Gameboy::CPU;
 using namespace Gameboy::General;
 
-CPU::CPU()
-    : instructions {
+const Instruction Gameboy::CPU::CPU::instructions[256] = {
         {1,  4,  0,  0,  0, nullptr},                     // 0x00 NOP
         {3, 12,  0, BC,  0, &CPU::load_d16_to_reg},       // 0x01 LD  BC,  d16
         {1,  8,  0, BC,  A, &CPU::load_reg8_to_regpt},    // 0x02 LD (BC),   A
@@ -222,8 +221,105 @@ CPU::CPU()
         {1,  4,  0,  A,  L, &CPU::cp_reg8_to_reg8},       // 0xBD CP  A, L
         {1,  8,  0,  A, HL, &CPU::cp_regpt_to_reg8},      // 0xBE CP  A, (HL)
         {1,  4,  0,  A,  A, &CPU::cp_reg8_to_reg8},       // 0xBF CP  A, A
-    }
+
+        // C BLOCK
+        {1,  20,  8, PC, SP, &CPU::ret_nz},               // 0xC0 RET NZ
+        {1,  12,  0, BC, SP, &CPU::pop},                  // 0xC1 POP BC
+        {3,  16, 12, PC,  0, &CPU::jmp_nz},               // 0xC2 JP NZ, a16
+        {3,  16,  0, PC,  0, &CPU::jmp},                  // 0xC3 JP a16
+        {3,  24, 12, SP, PC, &CPU::call_nz},              // 0xC4 CALL NZ, a16
+        {1,  16,  0, SP, BC, &CPU::push},                 // 0xC5 PUSH BC
+        {2,   8,  0,  A,  0, &CPU::add_d8_to_reg8},       // 0xC6 ADD A, d8
+        {1,  16,  0, SP, PC, &CPU::rst},                  // 0xC7 RST $00
+        {1,  20,  8, PC, SP, &CPU::ret_z},                // 0xC8 RET Z
+        {1,  16,  0, PC, SP, &CPU::ret},                  // 0xC9 RET
+        {3,  16, 12, PC,  0, &CPU::jmp_z},                // 0xCA JP Z, a16
+        {1,   4,  0,  0,  0, nullptr},                    // 0xCB PREFIX CB
+        {3,  24, 12, SP, PC, &CPU::call_z},               // 0xCC CALL Z, a16
+        {3,  24,  0, SP, PC, &CPU::call},                 // 0xCD CALL a16
+        {2,   8,  0,  A,  0, &CPU::add_d8_to_reg8_c},     // 0xCE ADC A, d8
+        {1,  16,  0, SP, PC, &CPU::rst},                  // 0xCF RST $08
+
+        // D BLOCK
+        {1,  20,  8, PC, SP, &CPU::ret_nc},               // 0xD0 RET NC
+        {1,  12,  0, DE, SP, &CPU::pop},                  // 0xD1 POP DE
+        {3,  16, 12, PC,  0, &CPU::jmp_nc},               // 0xD2 JP NC, a16
+        {1,   0,  0,  0,  0, nullptr},                    // 0xD3 NO INSTRUCTION
+        {3,  24, 12, SP, PC, &CPU::call_nc},              // 0xD4 CALL NC, a16
+        {1,  16,  0, SP, DE, &CPU::push},                 // 0xD5 PUSH DE
+        {2,   8,  0,  A,  0, &CPU::sub_d8_to_reg8},       // 0xD6 SUB A, d8
+        {1,  16,  0, SP, PC, &CPU::rst},                  // 0xD7 RST $10
+        {1,  20,  8, PC, SP, &CPU::ret_c},                // 0xD8 RET C
+        {1,  16,  0, PC, SP, &CPU::reti},                 // 0xD9 RETI
+        {3,  16, 12, PC,  0, &CPU::jmp_c},                // 0xDA JP C, a16
+        {1,   0,  0,  0,  0, nullptr},                    // 0xDB NO INSTRUCTION
+        {3,  24, 12, SP, PC, &CPU::call_c},               // 0xDC CALL C, a16
+        {1,   0,  0,  0,  0, nullptr},                    // 0xDD NO INSTRUCTION
+        {2,   8,  0,  A,  0, &CPU::sub_d8_to_reg8_c},     // 0xDE SBC A, d8
+        {1,  16,  0, SP, PC, &CPU::rst},                  // 0xDF RST $18
+
+        // E Block
+        {2,  12,  0,  0,  A, &CPU::load_reg8_to_d8pt},    // 0xE0 LDH (a8), A
+        {1,  12,  0, HL, SP, &CPU::pop},                  // 0xE1 POP HL
+        {1,   8,  0,  C,  A, &CPU::load_reg8_to_reg8pt},  // 0xE2 LD (C), A //TODO: make sure length is 1
+        {1,   0,  0,  0,  0, nullptr},                    // 0xE3 NO INSTRUCTION
+        {1,   0,  0,  0,  0, nullptr},                    // 0xE4 NO INSTRUCTION
+        {1,  16,  0, SP, HL, &CPU::push},                 // 0xE5 PUSH HL
+        {2,   8,  0,  A,  0, &CPU::and_d8_to_reg8},       // 0xE6 AND A, d8
+        {1,  16,  0, SP, PC, &CPU::rst},                  // 0xE7 RST $20
+        {2,  16,  0, SP,  0, &CPU::add_r8_to_reg16},      // 0xE8 ADD SP, r8 // TODO: Check flags if correct
+        {1,   4,  0, PC, HL, &CPU::jmp_regpt},            // 0xE9 JP (HL)
+        {3,  16,  0,  0,  A, &CPU::load_reg8_to_d16pt},   // 0xEA LD (a16), A
+        {1,   0,  0,  0,  0, nullptr},                    // 0xEB NO INSTRUCTION
+        {1,   0,  0,  0,  0, nullptr},                    // 0xEC NO INSTRUCTION
+        {1,   0,  0,  0,  0, nullptr},                    // 0xED NO INSTRUCTION
+        {2,   8,  0,  A,  0, &CPU::xor_d8_to_reg8},       // 0xEE XOR A, d8
+        {1,  16,  0, SP, PC, &CPU::rst},                  // 0xEF RST $28
+
+        // F BLOCK
+        {2,  12,  0,  A,  0, &CPU::load_d8pt_to_reg8},    // 0xF0 LDH A, (a8)
+        {1,  12,  0, AF, SP, &CPU::pop},                  // 0xF1 POP AF
+        {1,   8,  0,  A,  C, &CPU::load_reg8pt_to_reg8},  // 0xF2 LD A, (C) //TODO: make sure length is 1
+        {1,   4,  0,  0,  0, &CPU::disable_interrupts},   // 0xF3 DI
+        {1,   0,  0,  0,  0, nullptr},                    // 0xF4 NO INSTRUCTION
+        {1,  16,  0, SP, AF, &CPU::push},                 // 0xF5 PUSH AF
+        {2,   8,  0,  A,  0, &CPU::or_d8_to_reg8},        // 0xF6 OR A, d8
+        {1,  16,  0, SP, PC, &CPU::rst},                  // 0xF7 RST $30
+        {2,  12,  0, HL, SP, &CPU::ldhl_spr8},            // 0xF8 LD HL, SP+r8 // TODO: Check flags if correct
+        {1,   8,  0, SP, HL, &CPU::load_reg16_to_reg16},  // 0xF9 LD SP, HL
+        {3,  16,  0,  A,  0, &CPU::load_d16pt_to_reg8},   // 0xFA LD A, (a16)
+        {1,   4,  0,  0,  0, &CPU::enable_interrupts},    // 0xFB EI
+        {1,   0,  0,  0,  0, nullptr},                    // 0xFC NO INSTRUCTION
+        {1,   0,  0,  0,  0, nullptr},                    // 0xFD NO INSTRUCTION
+        {2,   8,  0,  A,  0, &CPU::cp_d8_to_reg8},        // 0xFE CP  A, d8
+        {1,  16,  0, SP, PC, &CPU::rst}                   // 0xFF RST $38
+};
+
+CPU::CPU()
+    : currentPC (),
+      interruptMasterEnable ()
 {}
+
+//interrupts
+std::uint8_t CPU::enable_interrupts (const Instruction& instruction) {
+    interruptMasterEnable = true;
+    return instruction.cycles;
+}
+
+std::uint8_t CPU::disable_interrupts (const Instruction& instruction) {
+    interruptMasterEnable = false;
+    return instruction.cycles;
+}
+
+// RST
+std::uint8_t CPU::rst (const Instruction& instruction) {
+    // A call is the same as pushing from the program counter
+    // dest has SP, src = PC
+    push(instruction);
+    // dynamically calculate from opcode
+    registers.write16(instruction.srcRegIndex, static_cast<uint16_t>(currentInstruction & 0x38));
+    return instruction.cycles;
+}
 
 // flags
 std::uint8_t CPU::set_carryflag (const Instruction& instruction) {
@@ -238,9 +334,49 @@ std::uint8_t CPU::cpl_carryflag (const Instruction& instruction) {
     return instruction.cycles;
 }
 
+// special loads
+std::uint8_t CPU::ldhl_spr8 (const Instruction& instruction) {
+    uint16_t srcVal = registers.read16(instruction.srcRegIndex);
+    int8_t srcValToAdd = static_cast<int8_t>(mmap.read(static_cast<uint16_t>(currentPC + 1)));
+
+    // Affected flags - Half Carry flag and Carry flag
+    registers.reg[F] &= ~(ZeroFlag | SubtractFlag | HalfCarryFlag | CarryFlag);
+    // set if carry from bit 11 0x0FFF
+    if (0x1000 & ((srcVal & 0x0FFF) + srcValToAdd)) {
+        registers.reg[F] |=  HalfCarryFlag;
+    }
+    // set if carry from bit 15
+    if (0x10000 & (static_cast<uint32_t>(srcVal) + srcValToAdd)) {
+        registers.reg[F] |=  CarryFlag;
+    }
+    return instruction.cycles;
+}
+
 // loads
+std::uint8_t CPU::load_reg16_to_reg16 (const Instruction& instruction) {
+    registers.write16(instruction.destRegIndex, registers.read16(instruction.srcRegIndex));
+    return instruction.cycles;
+}
+
+std::uint8_t CPU::load_reg16_to_d16pt (const Instruction& instruction) {
+    mmap.write16(mmap.read16(static_cast<uint16_t>(currentPC + 1)), registers.read16(instruction.srcRegIndex));
+    return instruction.cycles;
+}
+
 std::uint8_t CPU::load_d16_to_reg (const Instruction& instruction) {
     registers.write16(instruction.destRegIndex, mmap.read16(static_cast<uint16_t>(currentPC + 1)));
+    return instruction.cycles;
+}
+
+std::uint8_t CPU::load_d8pt_to_reg8 (const Instruction& instruction) {
+    registers.reg[instruction.destRegIndex] =
+            mmap.read(static_cast<uint16_t>(0xFF00 | mmap.read(static_cast<uint16_t>(currentPC + 1))));
+    return instruction.cycles;
+}
+
+std::uint8_t CPU::load_reg8pt_to_reg8 (const Instruction& instruction) {
+    registers.reg[instruction.destRegIndex] =
+            mmap.read(static_cast<uint16_t>(0xFF00 | registers.reg[instruction.srcRegIndex]));
     return instruction.cycles;
 }
 
@@ -256,6 +392,18 @@ std::uint8_t CPU::load_d8_to_regpt (const Instruction& instruction) {
 
 std::uint8_t CPU::load_reg8_to_regpt (const Instruction& instruction) {
     mmap.write(registers.read16(instruction.destRegIndex), registers.reg[instruction.srcRegIndex]);
+    return instruction.cycles;
+}
+
+std::uint8_t CPU::load_reg8_to_d8pt(const Instruction &instruction) {
+    mmap.write(static_cast<uint16_t>(0xFF00 | mmap.read(static_cast<uint16_t>(currentPC + 1))),
+               registers.reg[instruction.srcRegIndex]);
+    return instruction.cycles;
+}
+
+std::uint8_t CPU::load_reg8_to_reg8pt(const Instruction &instruction) {
+    mmap.write(static_cast<uint16_t>(0xFF00 | mmap.read(registers.reg[instruction.destRegIndex])),
+               registers.reg[instruction.srcRegIndex]);
     return instruction.cycles;
 }
 
@@ -297,8 +445,14 @@ std::uint8_t CPU::load_regptdec_to_reg8 (const Instruction& instruction) {
     return instruction.cycles;
 }
 
-std::uint8_t CPU::load_reg16_to_d16pt (const Instruction& instruction) {
-    mmap.write16(mmap.read16(static_cast<uint16_t>(currentPC + 1)), registers.read16(instruction.srcRegIndex));
+std::uint8_t CPU::load_reg8_to_d16pt(const Instruction &instruction) {
+    mmap.write(mmap.read16(static_cast<uint16_t>(currentPC + 1)), registers.reg[instruction.srcRegIndex]);
+    return instruction.cycles;
+}
+
+std::uint8_t CPU::load_d16pt_to_reg8 (const Instruction& instruction) {
+    registers.reg[instruction.destRegIndex] =
+            mmap.read(mmap.read16(static_cast<uint16_t>(currentPC + 1)));
     return instruction.cycles;
 }
 
@@ -398,6 +552,21 @@ std::uint8_t CPU::add_reg16_to_reg16 (const Instruction& instruction) {
     return instruction.cycles;
 }
 
+// SP add
+std::uint8_t CPU::add_r8_to_reg16 (const Instruction& instruction) {
+    int8_t srcVal  = static_cast<int8_t>(mmap.read(static_cast<uint16_t>(currentPC + 1)));
+    uint16_t destReg = registers.read16(instruction.destRegIndex);
+    registers.write16(instruction.destRegIndex, destReg + srcVal);
+
+    // Affected flags - Half Carry flag and Carry flag
+    registers.reg[F] &= ~(ZeroFlag | SubtractFlag | HalfCarryFlag | CarryFlag);
+    // set if carry from bit 11 0x0FFF
+    registers.reg[F] |= 0x1000 & ((destReg & 0x0FFF) + srcVal) ? HalfCarryFlag : 0;
+    // set if carry from bit 15
+    registers.reg[F] |= 0x10000 & (static_cast<uint32_t>(destReg) + srcVal) ? CarryFlag : 0;
+    return instruction.cycles;
+}
+
 // dest should always be the accumulator
 void CPU::add_val8_to_reg8_nc_c(std::uint8_t destRegIndex, std::uint8_t srcValue, bool carry) {
     uint8_t destRegValue = registers.reg[destRegIndex];
@@ -421,6 +590,16 @@ void CPU::add_val8_to_reg8_nc_c(std::uint8_t destRegIndex, std::uint8_t srcValue
     }
 }
 
+std::uint8_t CPU::add_d8_to_reg8 (const Instruction& instruction) {
+    add_val8_to_reg8_nc_c(instruction.destRegIndex, mmap.read(static_cast<uint16_t>(currentPC + 1)), false);
+    return instruction.cycles;
+}
+
+std::uint8_t CPU::add_d8_to_reg8_c (const Instruction& instruction) {
+    add_val8_to_reg8_nc_c(instruction.destRegIndex, mmap.read(static_cast<uint16_t>(currentPC + 1)), true);
+    return instruction.cycles;
+}
+
 std::uint8_t CPU::add_reg8_to_reg8 (const Instruction& instruction) {
     add_val8_to_reg8_nc_c(instruction.destRegIndex, registers.reg[instruction.srcRegIndex], false);
     return instruction.cycles;
@@ -442,7 +621,7 @@ std::uint8_t CPU::add_regpt_to_reg8_c (const Instruction& instruction) {
 }
 
 // decrements
-void CPU::dec_val8_from_reg8_nc_c(std::uint8_t destRegIndex, std::uint8_t srcValue, bool carry) {
+void CPU::sub_val8_from_reg8_nc_c(std::uint8_t destRegIndex, std::uint8_t srcValue, bool carry) {
     uint8_t destRegValue = registers.reg[destRegIndex];
     uint8_t carryValue = 0;
     uint8_t result = destRegValue - srcValue;
@@ -465,23 +644,33 @@ void CPU::dec_val8_from_reg8_nc_c(std::uint8_t destRegIndex, std::uint8_t srcVal
     }
 }
 
+std::uint8_t CPU::sub_d8_to_reg8 (const Instruction& instruction) {
+    sub_val8_from_reg8_nc_c(instruction.destRegIndex, mmap.read(static_cast<uint16_t>(currentPC + 1)), false);
+    return instruction.cycles;
+}
+
+std::uint8_t CPU::sub_d8_to_reg8_c (const Instruction& instruction) {
+    sub_val8_from_reg8_nc_c(instruction.destRegIndex, mmap.read(static_cast<uint16_t>(currentPC + 1)), true);
+    return instruction.cycles;
+}
+
 std::uint8_t CPU::sub_reg8_from_reg8(const Instruction &instruction) {
-    dec_val8_from_reg8_nc_c(instruction.destRegIndex, registers.reg[instruction.srcRegIndex], false);
+    sub_val8_from_reg8_nc_c(instruction.destRegIndex, registers.reg[instruction.srcRegIndex], false);
     return instruction.cycles;
 }
 
 std::uint8_t CPU::sub_reg8_from_reg8_c(const Instruction &instruction) {
-    dec_val8_from_reg8_nc_c(instruction.destRegIndex, registers.reg[instruction.srcRegIndex], true);
+    sub_val8_from_reg8_nc_c(instruction.destRegIndex, registers.reg[instruction.srcRegIndex], true);
     return instruction.cycles;
 }
 
 std::uint8_t CPU::sub_regpt_from_reg8(const Instruction &instruction) {
-    dec_val8_from_reg8_nc_c(instruction.destRegIndex, mmap.read(registers.read16(instruction.srcRegIndex)), false);
+    sub_val8_from_reg8_nc_c(instruction.destRegIndex, mmap.read(registers.read16(instruction.srcRegIndex)), false);
     return instruction.cycles;
 }
 
 std::uint8_t CPU::sub_regpt_from_reg8_c(const Instruction &instruction) {
-    dec_val8_from_reg8_nc_c(instruction.destRegIndex, mmap.read(registers.read16(instruction.srcRegIndex)), true);
+    sub_val8_from_reg8_nc_c(instruction.destRegIndex, mmap.read(registers.read16(instruction.srcRegIndex)), true);
     return instruction.cycles;
 }
 
@@ -504,6 +693,11 @@ std::uint8_t CPU::and_regpt_to_reg8 (const Instruction& instruction) {
     return instruction.cycles;
 }
 
+std::uint8_t CPU::and_d8_to_reg8 (const Instruction& instruction) {
+    and_val8_to_reg8(instruction.destRegIndex, mmap.read(static_cast<uint16_t>(currentPC + 1)));
+    return instruction.cycles;
+}
+
 // XOR
 void CPU::xor_val8_to_reg8(std::uint8_t destRegIndex, std::uint8_t srcValue) {
     registers.reg[F] &= ~(ZeroFlag | SubtractFlag | HalfCarryFlag | CarryFlag);
@@ -522,6 +716,11 @@ std::uint8_t CPU::xor_regpt_to_reg8 (const Instruction& instruction) {
     return instruction.cycles;
 }
 
+std::uint8_t CPU::xor_d8_to_reg8 (const Instruction& instruction) {
+    xor_val8_to_reg8(instruction.destRegIndex, mmap.read(static_cast<uint16_t>(currentPC + 1)));
+    return instruction.cycles;
+}
+
 // OR
 void CPU::or_val8_to_reg8(std::uint8_t destRegIndex, std::uint8_t srcValue) {
     registers.reg[F] &= ~(ZeroFlag | SubtractFlag | HalfCarryFlag | CarryFlag);
@@ -537,6 +736,11 @@ std::uint8_t CPU::or_reg8_to_reg8 (const Instruction& instruction) {
 
 std::uint8_t CPU::or_regpt_to_reg8 (const Instruction& instruction) {
     or_val8_to_reg8(instruction.destRegIndex, mmap.read(registers.read16(instruction.srcRegIndex)));
+    return instruction.cycles;
+}
+
+std::uint8_t CPU::or_d8_to_reg8 (const Instruction& instruction) {
+    or_val8_to_reg8(instruction.destRegIndex, mmap.read(static_cast<uint16_t>(currentPC + 1)));
     return instruction.cycles;
 }
 
@@ -565,6 +769,11 @@ std::uint8_t CPU::cp_reg8_to_reg8 (const Instruction& instruction) {
 
 std::uint8_t CPU::cp_regpt_to_reg8 (const Instruction& instruction) {
     cp_val8_to_reg8(instruction.destRegIndex, mmap.read(registers.read16(instruction.srcRegIndex)));
+    return instruction.cycles;
+}
+
+std::uint8_t CPU::cp_d8_to_reg8 (const Instruction& instruction) {
+    cp_val8_to_reg8(instruction.destRegIndex, mmap.read(static_cast<uint16_t>(currentPC + 1)));
     return instruction.cycles;
 }
 
@@ -647,8 +856,8 @@ std::uint8_t CPU::rel_cond_jmp (const Instruction& instruction, uint8_t flag, bo
     // destRegIndex must be PC
     // if ((negative && (registers.reg[F] & flag != 0)) || (!negative && (registers.reg[F] & flag == 0)))
     if (negative != ((registers.reg[F] & flag) == 0)) {
-        return rel_jmp(instruction);
-        //return instruction.cycles;
+        rel_jmp(instruction);
+        return instruction.cycles;
     }
     return instruction.cyclesNoAction;
 }
@@ -664,6 +873,129 @@ uint8_t CPU::rel_nc_jmp(const Instruction &instruction) {
 }
 uint8_t CPU::rel_c_jmp(const Instruction &instruction) {
     return rel_cond_jmp(instruction, CarryFlag, false);
+}
+
+// Jumps - absolute
+std::uint8_t CPU::jmp (const Instruction& instruction) {
+    // destRegIndex must be PC
+    registers.write16(instruction.destRegIndex, mmap.read16(static_cast<uint16_t>(currentPC + 1)));
+    return instruction.cycles;
+}
+
+std::uint8_t CPU::jmp_regpt (const Instruction& instruction) {
+    // destRegIndex must be PC
+    registers.write16(instruction.destRegIndex, mmap.read16(registers.read16(instruction.srcRegIndex)));
+    return instruction.cycles;
+}
+
+std::uint8_t CPU::jmp_cond (const Instruction& instruction, uint8_t flag, bool negative) {
+    // destRegIndex must be PC
+    if (negative != ((registers.reg[F] & flag) == 0)) {
+        jmp(instruction);
+        return instruction.cycles;
+    }
+    return instruction.cyclesNoAction;
+}
+
+uint8_t CPU::jmp_nz(const Instruction &instruction) {
+    return jmp_cond(instruction, ZeroFlag, true);
+}
+uint8_t CPU::jmp_z(const Instruction &instruction) {
+    return jmp_cond(instruction, ZeroFlag, false);
+}
+uint8_t CPU::jmp_nc(const Instruction &instruction) {
+    return jmp_cond(instruction, CarryFlag, true);
+}
+uint8_t CPU::jmp_c(const Instruction &instruction) {
+    return jmp_cond(instruction, CarryFlag, false);
+}
+
+// Ret
+std::uint8_t CPU::ret (const Instruction& instruction) {
+    // A jump is the same as popping to the program counter
+    pop(instruction);
+    return instruction.cycles;
+}
+
+std::uint8_t CPU::ret_cond (const Instruction& instruction, uint8_t flag, bool negative) {
+    if (negative != ((registers.reg[F] & flag) == 0)) {
+        ret(instruction);
+        return instruction.cycles;
+    }
+    return instruction.cyclesNoAction;
+}
+
+uint8_t CPU::ret_nz(const Instruction &instruction) {
+    return ret_cond(instruction, ZeroFlag, true);
+}
+uint8_t CPU::ret_z(const Instruction &instruction) {
+    return ret_cond(instruction, ZeroFlag, false);
+}
+uint8_t CPU::ret_nc(const Instruction &instruction) {
+    return ret_cond(instruction, CarryFlag, true);
+}
+uint8_t CPU::ret_c(const Instruction &instruction) {
+    return ret_cond(instruction, CarryFlag, false);
+}
+
+// Reti
+std::uint8_t CPU::reti (const Instruction& instruction) {
+    ret(instruction);
+    interruptMasterEnable = true;
+    return instruction.cycles;
+}
+
+// Pop
+std::uint8_t CPU::pop (const Instruction& instruction) {
+    // Read stack pointer - src has SP
+    uint16_t stackPointer = registers.read16(instruction.srcRegIndex);
+    // Copy to register - read two bytes from stack and assign them to destination register
+    registers.write16(instruction.destRegIndex, mmap.read16(stackPointer));
+    // Increment stack pointer
+    stackPointer += 2;
+    registers.write16(instruction.srcRegIndex, stackPointer);
+    return instruction.cycles;
+}
+
+// Push
+std::uint8_t CPU::push (const Instruction& instruction) {
+    // Read stack pointer
+    uint16_t stackPointer = registers.read16(instruction.destRegIndex);
+    // Copy to stack
+    mmap.write16(stackPointer -= 2, registers.read16(instruction.srcRegIndex));
+    // decrement stack pointer
+    registers.write16(instruction.destRegIndex, stackPointer);
+    return instruction.cycles;
+}
+
+std::uint8_t CPU::call (const Instruction& instruction) {
+    // A call is the same as pushing from the program counter
+    // dest has SP, src = PC
+    push(instruction);
+    // jump to address
+    registers.write16(instruction.srcRegIndex, mmap.read16(static_cast<uint16_t>(currentPC + 1)));
+    return instruction.cycles;
+}
+
+std::uint8_t CPU::call_cond (const Instruction& instruction, uint8_t flag, bool negative) {
+    if (negative != ((registers.reg[F] & flag) == 0)) {
+        call(instruction);
+        return instruction.cycles;
+    }
+    return instruction.cyclesNoAction;
+}
+
+uint8_t CPU::call_nz(const Instruction &instruction) {
+    return call_cond(instruction, ZeroFlag, true);
+}
+uint8_t CPU::call_z(const Instruction &instruction) {
+    return call_cond(instruction, ZeroFlag, false);
+}
+uint8_t CPU::call_nc(const Instruction &instruction) {
+    return call_cond(instruction, CarryFlag, true);
+}
+uint8_t CPU::call_c(const Instruction &instruction) {
+    return call_cond(instruction, CarryFlag, false);
 }
 
 // DAA - TODO: Use Z80 table instead, or check with it. This is probably buggy
@@ -704,7 +1036,7 @@ std::uint8_t CPU::next() {
 
     // fetch and decode
     currentPC = registers.read16(PC);
-    const Instruction& instruction = instructions[currentPC];
+    const Instruction& instruction = instructions[currentInstruction = mmap.read(currentPC)];
     registers.write16(PC, currentPC + instruction.length);
 
     // Execute

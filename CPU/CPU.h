@@ -23,8 +23,10 @@ namespace Gameboy {
         private:
             Registers registers;
             Memory::MemoryMappedIO mmap;
-            Instruction instructions[512];
+            static const Instruction instructions[256];
             uint16_t currentPC;
+            uint16_t currentInstruction;
+            bool interruptMasterEnable;
 
             // Instruction implementations
             std::uint8_t load_d16_to_reg(const Instruction &instruction);
@@ -107,7 +109,7 @@ namespace Gameboy {
 
             uint8_t add_regpt_to_reg8_c(const Instruction &instruction);
 
-            void dec_val8_from_reg8_nc_c(std::uint8_t destRegIndex, std::uint8_t srcValue, bool carry);
+            void sub_val8_from_reg8_nc_c(std::uint8_t destRegIndex, std::uint8_t srcValue, bool carry);
 
             uint8_t sub_reg8_from_reg8(const Instruction &instruction);
 
@@ -140,6 +142,91 @@ namespace Gameboy {
             uint8_t cp_reg8_to_reg8(const Instruction &instruction);
 
             uint8_t cp_regpt_to_reg8(const Instruction &instruction);
+
+            uint8_t ret(const Instruction &instruction);
+
+            uint8_t reti(const Instruction &instruction);
+
+            uint8_t ret_cond(const Instruction &instruction, uint8_t flag, bool negative);
+
+            uint8_t ret_nz(const Instruction &instruction);
+
+            uint8_t ret_z(const Instruction &instruction);
+
+            uint8_t ret_nc(const Instruction &instruction);
+
+            uint8_t ret_c(const Instruction &instruction);
+
+            uint8_t pop(const Instruction &instruction);
+
+            uint8_t jmp(const Instruction &instruction);
+
+            uint8_t jmp_cond(const Instruction &instruction, uint8_t flag, bool negative);
+
+            uint8_t jmp_nz(const Instruction &instruction);
+
+            uint8_t jmp_z(const Instruction &instruction);
+
+            uint8_t jmp_nc(const Instruction &instruction);
+
+            uint8_t jmp_c(const Instruction &instruction);
+
+            uint8_t push(const Instruction &instruction);
+
+            uint8_t call(const Instruction &instruction);
+
+            uint8_t call_cond(const Instruction &instruction, uint8_t flag, bool negative);
+
+            uint8_t call_nz(const Instruction &instruction);
+
+            uint8_t call_z(const Instruction &instruction);
+
+            uint8_t call_nc(const Instruction &instruction);
+
+            uint8_t call_c(const Instruction &instruction);
+
+            uint8_t add_d8_to_reg8(const Instruction &instruction);
+
+            uint8_t add_d8_to_reg8_c(const Instruction &instruction);
+
+            uint8_t sub_d8_to_reg8(const Instruction &instruction);
+
+            uint8_t sub_d8_to_reg8_c(const Instruction &instruction);
+
+            uint8_t rst(const Instruction &instruction);
+
+
+            uint8_t load_reg8_to_d8pt(const Instruction &instruction);
+
+            uint8_t load_reg8_to_reg8pt(const Instruction &instruction);
+
+            uint8_t and_d8_to_reg8(const Instruction &instruction);
+
+            uint8_t xor_d8_to_reg8(const Instruction &instruction);
+
+            uint8_t or_d8_to_reg8(const Instruction &instruction);
+
+            uint8_t cp_d8_to_reg8(const Instruction &instruction);
+
+            uint8_t add_r8_to_reg16(const Instruction &instruction);
+
+            uint8_t jmp_regpt(const Instruction &instruction);
+
+            uint8_t load_reg8_to_d16pt(const Instruction &instruction);
+
+            uint8_t load_d16pt_to_reg8(const Instruction &instruction);
+
+            uint8_t load_d8pt_to_reg8(const Instruction &instruction);
+
+            uint8_t load_reg8pt_to_reg8(const Instruction &instruction);
+
+            uint8_t enable_interrupts(const Instruction &instruction);
+
+            uint8_t disable_interrupts(const Instruction &instruction);
+
+            uint8_t load_reg16_to_reg16(const Instruction &instruction);
+
+            uint8_t ldhl_spr8(const Instruction &instruction);
         };
     }
 }
