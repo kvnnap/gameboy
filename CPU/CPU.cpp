@@ -295,6 +295,8 @@ const Instruction Gameboy::CPU::CPU::instructions[256] = {
         {1,  16,  0, SP, PC, &CPU::rst}                   // 0xFF RST $38
 };
 
+const uint8_t Gameboy::CPU::CPU::regMap[8] = {B, C, D, E, H, L, HL, A};
+
 CPU::CPU()
     : currentPC (),
       interruptMasterEnable ()
@@ -1035,15 +1037,75 @@ std::uint8_t CPU::next() {
     // Check interrupts
 
     // fetch and decode
-    currentPC = registers.read16(PC);
-    const Instruction& instruction = instructions[currentInstruction = mmap.read(currentPC)];
-    registers.write16(PC, currentPC + instruction.length);
+    bool extended = false;
+    const Instruction * instruction = nullptr;
+    do {
+        // buggy - TODO: Fix
+        currentPC = registers.read16(PC);
+        instruction = &instructions[currentInstruction = mmap.read(currentPC)];
+        registers.write16(PC, currentPC + instruction->length);
+        if (currentInstruction == 0xCB) {
+            extended = true;
+        }
+    } while (currentInstruction == 0xCB);
 
-    // Execute
-    uint8_t cycles = instruction.cycles;
-    if (instruction.execfn != nullptr) {
-        cycles = (this->*instruction.execfn)(instruction);
+
+    if (!extended) {
+        // Execute
+        uint8_t cycles = instruction->cycles;
+        if (instruction->execfn != nullptr) {
+            cycles = (this->*instruction->execfn)(*instruction);
+        }
+        return cycles;
+    } else {
+        // Extended (CB) instructions
+        const uint8_t rangeNum = static_cast<uint8_t>((currentInstruction >> 6) & 0x03);
+        const uint8_t regCpuMapIndex = static_cast<uint8_t>(currentInstruction & 0x07);
+        const uint8_t regIndex = regMap[regCpuMapIndex];
+        const bool isMemoryOperation = regCpuMapIndex == 0x06;
+
+        // Prepare variables for memory operation, read data and address
+        uint16_t address;
+        //union { // TODO: add union when not debugging
+            uint8_t readValue;
+            uint8_t writeValue;
+        //};
+
+        if (isMemoryOperation) {
+            address = registers.read16(regIndex);
+            readValue = mmap.read(address);
+        } else {
+            readValue = registers.reg[regIndex];
+        }
+
+        // Calculate operation
+        if (rangeNum == 0) {
+            writeValue = 0;
+            throw runtime_error ("0xCB00 to 0xCB3F not yet implemented");
+        } else {
+            const uint8_t bitNumFlag = static_cast<uint8_t>(1 << ((currentInstruction >> 3) & 0x07));
+            if (rangeNum == 1) {
+                // Reset flags
+                registers.reg[F] &= ~(ZeroFlag | SubtractFlag);
+                registers.reg[F] |= HalfCarryFlag;
+                if ((readValue & bitNumFlag) == 0) {
+                    registers.reg[F] |= ZeroFlag;
+                }
+            } else { // RES and SET instructions
+                writeValue = rangeNum == 2 ? readValue & ~bitNumFlag : readValue | bitNumFlag;
+            }
+        }
+
+        // Write value if neccessary
+        if (rangeNum != 1) {
+            if (isMemoryOperation) {
+                mmap.write(address, writeValue);
+            } else {
+                registers.reg[regIndex] = writeValue;
+            }
+        }
+
+        return static_cast<uint8_t>(isMemoryOperation ? 16 : 8);
     }
 
-    return cycles;
 }

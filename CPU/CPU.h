@@ -21,11 +21,13 @@ namespace Gameboy {
             std::uint8_t next();
 
         private:
+            static const Instruction instructions[256];
+            static const uint8_t regMap[8];
+
             Registers registers;
             Memory::MemoryMappedIO mmap;
-            static const Instruction instructions[256];
             uint16_t currentPC;
-            uint16_t currentInstruction;
+            uint8_t currentInstruction;
             bool interruptMasterEnable;
 
             // Instruction implementations
