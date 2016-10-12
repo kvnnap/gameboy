@@ -18,7 +18,7 @@ const Instruction Gameboy::CPU::CPU::instructions[256] = {
         {1,  4,  0,  B,  B, &CPU::inc_reg8},              // 0x04 INC  B // Flags
         {1,  4,  0,  B,  B, &CPU::dec_reg8},              // 0x05 DEC  B // Flags
         {2,  8,  0,  B,  0, &CPU::load_d8_to_reg},        // 0x06 LD  B,  d8
-        {1,  4,  0,  A,  A, &CPU::rlc_reg8},              // 0x07 RLCA // Flags
+        {1,  4,  0,  A,  A, &CPU::r_l_r_c_reg8},          // 0x07 RLCA // Flags
         {3, 20,  0,  0, SP, &CPU::load_reg16_to_d16pt},   // 0x08 LD (a16), SP
         {1,  8,  0, HL, BC, &CPU::add_reg16_to_reg16},    // 0x09 ADD HL, BC // Flags
         {1,  8,  0,  A, BC, &CPU::load_regpt_to_reg8},    // 0x0A LD A, (BC)
@@ -26,7 +26,7 @@ const Instruction Gameboy::CPU::CPU::instructions[256] = {
         {1,  4,  0,  C,  C, &CPU::inc_reg8},              // 0x0C INC  C // Flags
         {1,  4,  0,  C,  C, &CPU::dec_reg8},              // 0x0D DEC  C // Flags
         {2,  8,  0,  C,  0, &CPU::load_d8_to_reg},        // 0x0E LD  C,  d8
-        {1,  4,  0,  A,  A, &CPU::rrc_reg8},              // 0x0F RRCA // Flags
+        {1,  4,  0,  A,  A, &CPU::r_l_r_c_reg8},          // 0x0F RRCA // Flags
 
         {2,  4,  0,  0,  0, &CPU::stop},                  // 0x10 STOP TODO
         {3, 12,  0, DE,  0, &CPU::load_d16_to_reg},       // 0x11 LD  DE,  d16
@@ -35,7 +35,7 @@ const Instruction Gameboy::CPU::CPU::instructions[256] = {
         {1,  4,  0,  D,  D, &CPU::inc_reg8},              // 0x14 INC  D // Flags
         {1,  4,  0,  D,  D, &CPU::dec_reg8},              // 0x15 DEC  D // Flags
         {2,  8,  0,  D,  0, &CPU::load_d8_to_reg},        // 0x16 LD  D,  d8
-        {1,  4,  0,  A,  A, &CPU::rl_reg8},               // 0x17 RLA // Flags
+        {1,  4,  0,  A,  A, &CPU::r_l_r_c_reg8},          // 0x17 RLA // Flags
         {2, 12,  0, PC,  0, &CPU::rel_jmp},               // 0x18 JR r8
         {1,  8,  0, HL, DE, &CPU::add_reg16_to_reg16},    // 0x19 ADD HL, DE // Flags
         {1,  8,  0,  A, DE, &CPU::load_regpt_to_reg8},    // 0x1A LD A, (DE)
@@ -43,7 +43,7 @@ const Instruction Gameboy::CPU::CPU::instructions[256] = {
         {1,  4,  0,  E,  E, &CPU::inc_reg8},              // 0x1C INC  E // Flags
         {1,  4,  0,  E,  E, &CPU::dec_reg8},              // 0x1D DEC  E // Flags
         {2,  8,  0,  E,  0, &CPU::load_d8_to_reg},        // 0x1E LD  E,  d8
-        {1,  4,  0,  A,  A, &CPU::rr_reg8},               // 0x1F RRA // Flags
+        {1,  4,  0,  A,  A, &CPU::r_l_r_c_reg8},          // 0x1F RRA // Flags
 
         // Try to remove the need for two instruction cycle durations - 0x20 is one example
         {2, 12,  8, PC,  0, &CPU::rel_nz_jmp},            // 0x20 JR  NZ, r8
@@ -779,61 +779,78 @@ std::uint8_t CPU::cp_d8_to_reg8 (const Instruction& instruction) {
     return instruction.cycles;
 }
 
-// rotates
-std::uint8_t CPU::rlc_reg8 (const Instruction& instruction) {
-    uint8_t regValue = registers.reg[instruction.destRegIndex];
-    uint8_t bit7 = static_cast<uint8_t>(regValue & 0x80 ? 1 : 0);
-    regValue <<= 1;
-    regValue |= bit7;
-    registers.reg[instruction.destRegIndex] = regValue;
-
+// Rotates
+std::uint8_t CPU::r_l_r_c_val8(std::uint8_t val) {
+    // Derive whether to carry from currentInstruction
+    const bool carry = !(currentInstruction & 0x10); // same as (currentInstruction & 0x10) == 0
+    const bool left = !(currentInstruction & 0x08);
+    bool lsbMsbSet; //lsb or msb bit set
+    if (left) {
+        lsbMsbSet = (val & 0x80) != 0; //MSB
+        val <<= 1;
+        val |= carry ? (lsbMsbSet ? 0x01 : 0) : (registers.reg[F] & CarryFlag ? 0x01 : 0);
+    } else {
+        lsbMsbSet = (val & 0x01) != 0; //LSB
+        val >>= 1;
+        val |= carry ? (lsbMsbSet ? 0x80 : 0) : (registers.reg[F] & CarryFlag ? 0x80 : 0);
+    }
     // Affected flags - Zero and Carry flag
     registers.reg[F] &= ~(ZeroFlag | SubtractFlag | HalfCarryFlag | CarryFlag);
-    registers.reg[F] |= regValue == 0 ? ZeroFlag : 0;
-    registers.reg[F] |= bit7 ? CarryFlag : 0;
+    if (lsbMsbSet) {
+        registers.reg[F] |= CarryFlag;
+    }
+    if (isCurrentExtended && val == 0) { // only executed by the extended instructions
+        registers.reg[F] |= ZeroFlag;
+    }
+    return val;
+}
+
+std::uint8_t CPU::r_l_r_c_reg8 (const Instruction& instruction) {
+    registers.reg[instruction.destRegIndex] = r_l_r_c_val8(registers.reg[instruction.destRegIndex]);
     return instruction.cycles;
 }
 
-std::uint8_t CPU::rrc_reg8 (const Instruction& instruction) {
-    uint8_t regValue = registers.reg[instruction.destRegIndex];
-    uint8_t bit0 = static_cast<uint8_t>(regValue & 0x01);
-    regValue >>= 1; // right shifting on unsigned should not preserve sign bit - exactly what we want
-    regValue |= bit0 ? 0x80 : 0;
-    registers.reg[instruction.destRegIndex] = regValue;
+// Shifts
+std::uint8_t CPU::s_l_r_a_l_val8(std::uint8_t val) {
+    // Derive whether to carry from currentInstruction
+    const bool up = !(currentInstruction & 0x10); // arithmetic are up/ logical are down with swap
+    const bool left = !(currentInstruction & 0x08); //right are all shifts/ left could be swap
 
-    // Affected flags - Zero and Carry flag
+    // Affected flags
     registers.reg[F] &= ~(ZeroFlag | SubtractFlag | HalfCarryFlag | CarryFlag);
-    registers.reg[F] |= regValue == 0 ? ZeroFlag : 0;
-    registers.reg[F] |= bit0 ? CarryFlag : 0;
-    return instruction.cycles;
-}
 
-std::uint8_t CPU::rl_reg8 (const Instruction& instruction) {
-    uint8_t regValue = registers.reg[instruction.destRegIndex];
-    uint8_t bit7 = static_cast<uint8_t>(regValue & 0x80);
-    regValue <<= 1;
-    regValue |= registers.reg[F] & CarryFlag ? 1 : 0;
-    registers.reg[instruction.destRegIndex] = regValue;
+    if (left) {
+        // Left arithmetic shift + Swap
+        if (up) {
+            // left arithmetic shift
+            const uint8_t msbSet = static_cast<uint8_t>(val & 0x80);
+            if (msbSet) {
+                registers.reg[F] = CarryFlag;
+            }
+            val <<= 1;
+        } else {
+            // swap
+            val = static_cast<uint8_t>((val << 4) | (val >> 4));
+        }
 
-    // Affected flags - Zero and Carry flag
-    registers.reg[F] &= ~(ZeroFlag | SubtractFlag | HalfCarryFlag | CarryFlag);
-    registers.reg[F] |= regValue == 0 ? ZeroFlag : 0;
-    registers.reg[F] |= bit7 ? CarryFlag : 0;
-    return instruction.cycles;
-}
+    } else {
+        // right logical
+        const uint8_t msbSet = static_cast<uint8_t>(val & 0x80);
+        if (val & 0x01) {
+            registers.reg[F] = CarryFlag;
+        }
+        val >>= 1;
+        // right arithmetic is same as logical but preserves MSB
+        if (!up && msbSet) {
+            val |= msbSet;
+        }
+    }
 
-std::uint8_t CPU::rr_reg8 (const Instruction& instruction) {
-    uint8_t regValue = registers.reg[instruction.destRegIndex];
-    uint8_t bit0 = static_cast<uint8_t>(regValue & 0x01);
-    regValue >>= 1; // right shifting on unsigned should not preserve sign bit - exactly what we want
-    regValue |= registers.reg[F] & CarryFlag ? 0x80 : 0;
-    registers.reg[instruction.destRegIndex] = regValue;
+    if (val == 0) { // only executed by the extended instructions
+        registers.reg[F] |= ZeroFlag;
+    }
 
-    // Affected flags - Zero and Carry flag
-    registers.reg[F] &= ~(ZeroFlag | SubtractFlag | HalfCarryFlag | CarryFlag);
-    registers.reg[F] |= regValue == 0 ? ZeroFlag : 0;
-    registers.reg[F] |= bit0 ? CarryFlag : 0;
-    return instruction.cycles;
+    return val;
 }
 
 std::uint8_t CPU::stop (const Instruction& instruction) {
@@ -1037,7 +1054,7 @@ std::uint8_t CPU::next() {
     // Check interrupts
 
     // fetch and decode
-    bool extended = false;
+    isCurrentExtended = false;
     const Instruction * instruction = nullptr;
     do {
         // buggy - TODO: Fix
@@ -1045,12 +1062,12 @@ std::uint8_t CPU::next() {
         instruction = &instructions[currentInstruction = mmap.read(currentPC)];
         registers.write16(PC, currentPC + instruction->length);
         if (currentInstruction == 0xCB) {
-            extended = true;
+            isCurrentExtended = true;
         }
     } while (currentInstruction == 0xCB);
 
 
-    if (!extended) {
+    if (!isCurrentExtended) {
         // Execute
         uint8_t cycles = instruction->cycles;
         if (instruction->execfn != nullptr) {
@@ -1080,11 +1097,16 @@ std::uint8_t CPU::next() {
 
         // Calculate operation
         if (rangeNum == 0) {
-            writeValue = 0;
-            throw runtime_error ("0xCB00 to 0xCB3F not yet implemented");
+            if (currentInstruction & 0x20) {
+                // 0x20 - 0x3F - shift left, right, right logical, swap
+                writeValue = s_l_r_a_l_val8(readValue);
+            } else {
+                // 0x00 - 0x1F - Rotates
+                writeValue = r_l_r_c_val8(readValue);
+            }
         } else {
             const uint8_t bitNumFlag = static_cast<uint8_t>(1 << ((currentInstruction >> 3) & 0x07));
-            if (rangeNum == 1) {
+            if (rangeNum == 1) { // BIT instructions
                 // Reset flags
                 registers.reg[F] &= ~(ZeroFlag | SubtractFlag);
                 registers.reg[F] |= HalfCarryFlag;
@@ -1107,5 +1129,4 @@ std::uint8_t CPU::next() {
 
         return static_cast<uint8_t>(isMemoryOperation ? 16 : 8);
     }
-
 }

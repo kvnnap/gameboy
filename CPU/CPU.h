@@ -28,6 +28,7 @@ namespace Gameboy {
             Memory::MemoryMappedIO mmap;
             uint16_t currentPC;
             uint8_t currentInstruction;
+            bool isCurrentExtended;
             bool interruptMasterEnable;
 
             // Instruction implementations
@@ -43,8 +44,6 @@ namespace Gameboy {
 
             std::uint8_t load_d8_to_reg(const Instruction &instruction);
 
-            std::uint8_t rlc_reg8(const Instruction &instruction);
-
             std::uint8_t load_reg16_to_d16pt(const Instruction &instruction);
 
             std::uint8_t add_reg16_to_reg16(const Instruction &instruction);
@@ -53,15 +52,9 @@ namespace Gameboy {
 
             std::uint8_t dec_reg16(const Instruction &instruction);
 
-            std::uint8_t rrc_reg8(const Instruction &instruction);
-
             std::uint8_t stop(const Instruction &instruction);
 
-            std::uint8_t rl_reg8(const Instruction &instruction);
-
             std::uint8_t rel_jmp(const Instruction &instruction);
-
-            std::uint8_t rr_reg8(const Instruction &instruction);
 
             uint8_t rel_nz_jmp(const Instruction &instruction);
 
@@ -229,6 +222,12 @@ namespace Gameboy {
             uint8_t load_reg16_to_reg16(const Instruction &instruction);
 
             uint8_t ldhl_spr8(const Instruction &instruction);
+
+            uint8_t r_l_r_c_val8(uint8_t val);
+
+            uint8_t r_l_r_c_reg8(const Instruction &instruction);
+
+            uint8_t s_l_r_a_l_val8(uint8_t val);
         };
     }
 }
