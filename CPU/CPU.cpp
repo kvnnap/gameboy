@@ -297,8 +297,9 @@ const Instruction Gameboy::CPU::CPU::instructions[256] = {
 
 const uint8_t Gameboy::CPU::CPU::regMap[8] = {B, C, D, E, H, L, HL, A};
 
-CPU::CPU()
-    : currentPC (),
+CPU::CPU(Memory::MemoryMappedIO& p_mmap)
+    : mmap ( p_mmap ),
+      currentPC (),
       interruptMasterEnable ()
 {}
 
@@ -873,8 +874,8 @@ std::uint8_t CPU::rel_jmp (const Instruction& instruction) {
 
 std::uint8_t CPU::rel_cond_jmp (const Instruction& instruction, uint8_t flag, bool negative) {
     // destRegIndex must be PC
-    // if ((negative && (registers.reg[F] & flag != 0)) || (!negative && (registers.reg[F] & flag == 0)))
-    if (negative != ((registers.reg[F] & flag) == 0)) {
+    // if ((negative && (registers.reg[F] & flag == 0)) || (!negative && (registers.reg[F] & flag != 0)))
+    if (negative != ((registers.reg[F] & flag) != 0)) {
         rel_jmp(instruction);
         return instruction.cycles;
     }
@@ -909,7 +910,7 @@ std::uint8_t CPU::jmp_regpt (const Instruction& instruction) {
 
 std::uint8_t CPU::jmp_cond (const Instruction& instruction, uint8_t flag, bool negative) {
     // destRegIndex must be PC
-    if (negative != ((registers.reg[F] & flag) == 0)) {
+    if (negative != ((registers.reg[F] & flag) != 0)) {
         jmp(instruction);
         return instruction.cycles;
     }
@@ -937,7 +938,7 @@ std::uint8_t CPU::ret (const Instruction& instruction) {
 }
 
 std::uint8_t CPU::ret_cond (const Instruction& instruction, uint8_t flag, bool negative) {
-    if (negative != ((registers.reg[F] & flag) == 0)) {
+    if (negative != ((registers.reg[F] & flag) != 0)) {
         ret(instruction);
         return instruction.cycles;
     }
@@ -997,7 +998,7 @@ std::uint8_t CPU::call (const Instruction& instruction) {
 }
 
 std::uint8_t CPU::call_cond (const Instruction& instruction, uint8_t flag, bool negative) {
-    if (negative != ((registers.reg[F] & flag) == 0)) {
+    if (negative != ((registers.reg[F] & flag) != 0)) {
         call(instruction);
         return instruction.cycles;
     }
@@ -1056,16 +1057,20 @@ std::uint8_t CPU::next() {
     // fetch and decode
     isCurrentExtended = false;
     const Instruction * instruction = nullptr;
-    do {
-        // buggy - TODO: Fix
-        currentPC = registers.read16(PC);
-        instruction = &instructions[currentInstruction = mmap.read(currentPC)];
-        registers.write16(PC, currentPC + instruction->length);
-        if (currentInstruction == 0xCB) {
-            isCurrentExtended = true;
-        }
-    } while (currentInstruction == 0xCB);
 
+    currentPC = registers.read16(PC);
+    instruction = &instructions[currentInstruction = mmap.read(currentPC)];
+    registers.write16(PC, currentPC + instruction->length);
+    if (currentInstruction == 0xCB) {
+        isCurrentExtended = true;
+        currentPC = registers.read16(PC);
+        currentInstruction = mmap.read(currentPC);
+        instruction = nullptr;
+        registers.write16(PC, static_cast<uint16_t>(currentPC + 1));
+        // read next instruction
+    }
+
+    //cout << hex << currentPC << endl;
 
     if (!isCurrentExtended) {
         // Execute
@@ -1075,7 +1080,7 @@ std::uint8_t CPU::next() {
         }
         return cycles;
     } else {
-        // Extended (CB) instructions
+        // Extended (CB) instructions - rangeNum might be more expensive
         const uint8_t rangeNum = static_cast<uint8_t>((currentInstruction >> 6) & 0x03);
         const uint8_t regCpuMapIndex = static_cast<uint8_t>(currentInstruction & 0x07);
         const uint8_t regIndex = regMap[regCpuMapIndex];

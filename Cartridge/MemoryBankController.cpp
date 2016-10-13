@@ -18,7 +18,7 @@ MemoryBankController::MemoryBankController(const Rom &p_rom, Ram &p_ram)
 {}
 
 uint8_t MemoryBankController::read(uint16_t address) const {
-    if (address >= MemoryMap::RomBank0 && address < MemoryMap::VideoRam) {
+    if (address < MemoryMap::VideoRam) {
         return rom.readExt(address - MemoryMap::RomBank0);
     } else if (address >= MemoryMap::RamBankN && address < MemoryMap::InternalRam) {
         return ram.readExt(address - MemoryMap::RamBankN);

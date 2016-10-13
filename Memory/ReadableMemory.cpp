@@ -13,7 +13,7 @@ uint8_t ReadableMemory::readExt(size_t address) const {
     return memory.at(address);
 }
 
-void ReadableMemory::initialise(MemoryType& data) {
+void ReadableMemory::initialise(MemoryType&& data) {
     memory = move(data);
 }
 
@@ -27,6 +27,10 @@ const uint8_t &ReadableMemory::readExtRef(size_t address) const {
 
 std::size_t ReadableMemory::getSize() const {
     return memory.size();
+}
+
+void ReadableMemory::initialise(MemoryType &data) {
+    memory = move(data);
 }
 
 

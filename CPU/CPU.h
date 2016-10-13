@@ -16,7 +16,7 @@ namespace Gameboy {
         class CPU {
         public:
 
-            CPU();
+            CPU(Memory::MemoryMappedIO& p_mmap);
 
             std::uint8_t next();
 
@@ -25,7 +25,7 @@ namespace Gameboy {
             static const uint8_t regMap[8];
 
             Registers registers;
-            Memory::MemoryMappedIO mmap;
+            Memory::MemoryMappedIO& mmap;
             uint16_t currentPC;
             uint8_t currentInstruction;
             bool isCurrentExtended;

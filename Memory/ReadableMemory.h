@@ -17,6 +17,7 @@ namespace Gameboy {
         public:
             virtual ~ReadableMemory();
             virtual void initialise(MemoryType& data);
+            virtual void initialise(MemoryType&& data);
 
             std::uint8_t readExt(std::size_t address) const;
             const std::uint8_t& readExtRef(std::size_t address = 0) const;

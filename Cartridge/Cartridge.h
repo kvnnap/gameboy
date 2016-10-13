@@ -30,6 +30,7 @@ namespace Gameboy {
 
             const Rom& getRom() const;
             const Ram& getRam() const;
+            MemoryBankController& getMBC();
         private:
             Rom rom;
             Ram ram;
