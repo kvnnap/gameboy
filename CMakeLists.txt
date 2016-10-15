@@ -20,6 +20,8 @@ file(GLOB_RECURSE SOURCE_FILES
      Cartridge/*.cpp
      CPU/*.cpp
      General/*.cpp
+     GPU/*.cpp
+     Input/*.cpp
      Memory/*.cpp
 )
 

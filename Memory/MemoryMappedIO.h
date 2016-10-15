@@ -6,6 +6,7 @@
 #define GAMEBOY_MEMORYMAPPEDIO_H
 
 #include <string>
+#include "Input/Joypad.h"
 #include "Cartridge/Cartridge.h"
 #include "General/IReadableWritable.h"
 
@@ -28,6 +29,7 @@ namespace Gameboy {
             Memory::ReadableWritableMemory videoRam;
             Memory::ReadableWritableMemory internalRam;
             Memory::ReadableWritableMemory spriteRam;
+            Input::Joypad joypad;
             Memory::ReadableWritableMemory ioPorts;
             Memory::ReadableWritableMemory zeroPageRam;
             uint8_t interruptEnableRegister;

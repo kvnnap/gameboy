@@ -300,7 +300,8 @@ const uint8_t Gameboy::CPU::CPU::regMap[8] = {B, C, D, E, H, L, HL, A};
 CPU::CPU(Memory::MemoryMappedIO& p_mmap)
     : mmap ( p_mmap ),
       currentPC (),
-      interruptMasterEnable ()
+      interruptMasterEnable (),
+      ticks ()
 {}
 
 //interrupts
@@ -1050,9 +1051,7 @@ uint8_t CPU::daa(const Instruction &instruction) {
     return instruction.cycles;
 }
 
-std::uint8_t CPU::next() {
-
-    // Check interrupts
+void CPU::next() {
 
     // fetch and decode
     isCurrentExtended = false;
@@ -1070,15 +1069,13 @@ std::uint8_t CPU::next() {
         // read next instruction
     }
 
-    //cout << hex << currentPC << endl;
-
     if (!isCurrentExtended) {
         // Execute
         uint8_t cycles = instruction->cycles;
         if (instruction->execfn != nullptr) {
             cycles = (this->*instruction->execfn)(*instruction);
         }
-        return cycles;
+        ticks += cycles;
     } else {
         // Extended (CB) instructions - rangeNum might be more expensive
         const uint8_t rangeNum = static_cast<uint8_t>((currentInstruction >> 6) & 0x03);
@@ -1123,7 +1120,7 @@ std::uint8_t CPU::next() {
             }
         }
 
-        // Write value if neccessary
+        // Write value if necessary
         if (rangeNum != 1) {
             if (isMemoryOperation) {
                 mmap.write(address, writeValue);
@@ -1132,6 +1129,35 @@ std::uint8_t CPU::next() {
             }
         }
 
-        return static_cast<uint8_t>(isMemoryOperation ? 16 : 8);
+        ticks += isMemoryOperation ? 16 : 8;
+    }
+
+    // Check interrupts
+    if (interruptMasterEnable) {
+        // Read interrupt enable register
+        uint8_t ier = mmap.read(0xFFFF);
+        uint8_t ifr;
+        if (ier != 0) {
+            ifr = mmap.read(0xFF0F);
+            if (ifr != 0) {
+                // Some interrupt was raised, handle the interrupt
+                for (size_t i = 0; i < 5; ++i) {
+                    if (ifr & (1 << i)) {
+                        // handle interrupt i, reset IF flag
+                        mmap.write(0xFF0F, static_cast<uint8_t>(ifr & ~(1 << i)));
+                        interruptMasterEnable = false;
+                        // Read stack pointer
+                        uint16_t stackPointer = registers.read16(SP);
+                        // Copy to stack
+                        mmap.write16(stackPointer -= 2, registers.read16(PC));
+                        // decrement stack pointer
+                        registers.write16(SP, stackPointer);
+                        // jump to address
+                        registers.write16(PC, static_cast<uint16_t>(0x0040 | (i << 3)));
+                        break;
+                    }
+                }
+            }
+        }
     }
 }

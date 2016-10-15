@@ -60,6 +60,9 @@ uint8_t MemoryMappedIO::read(uint16_t address) const {
                     throw runtime_error("Read range error: " + to_string(address));
                 } else if (address < UnusableIO2) {
                     // 0xFF00 - 0xFF4B - Usable I/O
+                    if (address == 0xFF00) {
+                        return joypad.read(address);
+                    }
                     return ioPorts.readExt(address - IOPorts);
                 } else if (address < ZeroPageRam) {
                     // 0xFF4C - 0xFF79 - Usable I/O
@@ -111,6 +114,9 @@ void MemoryMappedIO::write(uint16_t address, uint8_t datum) {
                     throw runtime_error("Write range error: " + to_string(address));
                 } else if (address < UnusableIO2) {
                     // 0xFF00 - 0xFF4B - Usable I/O
+                    if (address == 0xFF00) {
+                        return joypad.write(address, datum);
+                    }
                     return ioPorts.writeExt(address - IOPorts, datum);
                 } else if (address < ZeroPageRam) {
                     // 0xFF4C - 0xFF79 - Usable I/O

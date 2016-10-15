@@ -18,7 +18,7 @@ namespace Gameboy {
 
             CPU(Memory::MemoryMappedIO& p_mmap);
 
-            std::uint8_t next();
+            void next();
 
         private:
             static const Instruction instructions[256];
@@ -30,6 +30,8 @@ namespace Gameboy {
             uint8_t currentInstruction;
             bool isCurrentExtended;
             bool interruptMasterEnable;
+
+            uint32_t ticks;
 
             // Instruction implementations
             std::uint8_t load_d16_to_reg(const Instruction &instruction);
