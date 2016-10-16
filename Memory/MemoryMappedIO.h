@@ -6,6 +6,7 @@
 #define GAMEBOY_MEMORYMAPPEDIO_H
 
 #include <string>
+#include "GPU/GPU.h"
 #include "Input/Joypad.h"
 #include "Cartridge/Cartridge.h"
 #include "General/IReadableWritable.h"
@@ -22,14 +23,18 @@ namespace Gameboy {
             std::uint8_t read(std::uint16_t address) const override;
             void write(std::uint16_t address, std::uint8_t datum) override;
 
+            void setInput(Input::Joypad &p_joypad);
+
+            void setGpu(GPU::GPU &p_gpu);
+
         private:
             // has rom and its own ram
             Memory::ReadableMemory bios;
             Cartridge::MemoryBankController& mbc;
-            Memory::ReadableWritableMemory videoRam;
             Memory::ReadableWritableMemory internalRam;
-            Memory::ReadableWritableMemory spriteRam;
-            Input::Joypad joypad;
+
+            Input::Joypad * joypad;
+            GPU::GPU * gpu;
             Memory::ReadableWritableMemory ioPorts;
             Memory::ReadableWritableMemory zeroPageRam;
             uint8_t interruptEnableRegister;

@@ -8,8 +8,9 @@
 using namespace std;
 using namespace Gameboy::Input;
 
-Joypad::Joypad()
-    : inputRegister (0x0F)
+Joypad::Joypad(CPU::IInterruptible& p_interruptible)
+    : interruptible (p_interruptible),
+      inputRegister (0x0F)
 {}
 
 uint8_t Joypad::read(uint16_t address) const {

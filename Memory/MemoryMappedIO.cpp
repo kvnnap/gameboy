@@ -7,6 +7,7 @@
 #include "MemoryMappedIO.h"
 #include "General/Definitions.h"
 #include "General/FileOperations.h"
+#include "GPU/GPU.h"
 
 using namespace std;
 using namespace Gameboy;
@@ -15,13 +16,12 @@ using namespace Gameboy::Memory;
 MemoryMappedIO::MemoryMappedIO(Cartridge::MemoryBankController& p_mbc)
     :
         mbc ( p_mbc ),
+        joypad ( nullptr ),
         interruptEnableRegister (),
         lowMemoryIsCartridge ()
 {
     bios.initialise(Util::FileOperations::loadBinaryFile("DMG_ROM.bin"));
-    videoRam.initialise(MemoryType(8192));
     internalRam.initialise(MemoryType(8192));
-    spriteRam.initialise(MemoryType(160));
     ioPorts.initialise(MemoryType(76));
     zeroPageRam.initialise(MemoryType(127));
 }
@@ -40,7 +40,7 @@ uint8_t MemoryMappedIO::read(uint16_t address) const {
         switch (rangeNum) {
             case 0:
                 // 0x8000 - 0x9FFF - video ram
-                return videoRam.readExt(address - VideoRam);
+                return gpu->read(address);
             case 1:
                 // 0xA000 - 0xBFFF -- cartridge switchable ram
                 return mbc.read(address);
@@ -54,16 +54,20 @@ uint8_t MemoryMappedIO::read(uint16_t address) const {
                     return internalRam.readExt(address - EchoRam);
                 } else if (address < UnusableIO1) {
                     // 0xFE00 - 0xFE9f - Sprite attribute ram
-                    return spriteRam.readExt(address - SpriteRam);
+                    return gpu->read(address);
                 } else if (address < IOPorts) {
                     // 0xFEA0 - 0xFEFF - Unusable
                     throw runtime_error("Read range error: " + to_string(address));
                 } else if (address < UnusableIO2) {
                     // 0xFF00 - 0xFF4B - Usable I/O
                     if (address == 0xFF00) {
-                        return joypad.read(address);
+                        return joypad->read(address);
+                    } else if (address >= GPU::LCDC && address <= GPU::WX) {
+                        return gpu->read(address);
+                    } else {
+                        return ioPorts.readExt(address - IOPorts);
                     }
-                    return ioPorts.readExt(address - IOPorts);
+                    //throw runtime_error ("Cannot read from Unhandled I/O Device Register at address: " + to_string(address));
                 } else if (address < ZeroPageRam) {
                     // 0xFF4C - 0xFF79 - Usable I/O
                     throw runtime_error("Read range error: " + to_string(address));
@@ -94,7 +98,7 @@ void MemoryMappedIO::write(uint16_t address, uint8_t datum) {
         switch (rangeNum) {
             case 0:
                 // 0x8000 - 0x9FFF - video ram
-                return videoRam.writeExt(address - VideoRam, datum);
+                return gpu->write(address, datum);
             case 1:
                 // 0xA000 - 0xBFFF -- cartridge switchable ram
                 return mbc.write(address, datum);
@@ -108,16 +112,22 @@ void MemoryMappedIO::write(uint16_t address, uint8_t datum) {
                     return internalRam.writeExt(address - EchoRam, datum);
                 } else if (address < UnusableIO1) {
                     // 0xFE00 - 0xFE9f - Sprite attribute ram
-                    return spriteRam.writeExt(address - SpriteRam, datum);
+                    return gpu->write(address, datum);
                 } else if (address < IOPorts) {
                     // 0xFEA0 - 0xFEFF - Unusable
                     throw runtime_error("Write range error: " + to_string(address));
                 } else if (address < UnusableIO2) {
                     // 0xFF00 - 0xFF4B - Usable I/O
                     if (address == 0xFF00) {
-                        return joypad.write(address, datum);
+                        return joypad->write(address, datum);
+                    } else if (address >= GPU::LCDC && address <= GPU::WX) {
+                        return gpu->write(address, datum);
+                    } else {
+                        // Sound, timer and serial still unhandled
+                        return ioPorts.writeExt(address - IOPorts, datum);
                     }
-                    return ioPorts.writeExt(address - IOPorts, datum);
+                    //throw runtime_error ("Cannot write to Unhandled I/O Device Register at address: "
+                    //                     + to_string(address) + ", datum: " + to_string(static_cast<uint32_t>(datum)));
                 } else if (address < ZeroPageRam) {
                     // 0xFF4C - 0xFF79 - Usable I/O
                     if (address == 0xFF50) {
@@ -135,6 +145,14 @@ void MemoryMappedIO::write(uint16_t address, uint8_t datum) {
                 throw runtime_error("Write range error: " + to_string(address));
         }
     }
+}
+
+void MemoryMappedIO::setInput(Input::Joypad &p_joypad) {
+    joypad = &p_joypad;
+}
+
+void MemoryMappedIO::setGpu(GPU::GPU &p_gpu) {
+    gpu = &p_gpu;
 }
 
 

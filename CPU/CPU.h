@@ -8,17 +8,23 @@
 #include "Memory/MemoryMappedIO.h"
 #include "Registers.h"
 #include "Instruction.h"
+#include "IInterruptible.h"
 
 namespace Gameboy {
     namespace CPU {
 
         // Gameboy CPU LR35902
-        class CPU {
+        class CPU
+            : public IInterruptible
+        {
         public:
 
             CPU(Memory::MemoryMappedIO& p_mmap);
 
+            std::uint32_t getTicks() const;
             void next();
+
+            void interrupt(std::uint8_t irqLine) override;
 
         private:
             static const Instruction instructions[256];

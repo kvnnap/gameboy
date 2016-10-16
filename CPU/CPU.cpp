@@ -1051,6 +1051,7 @@ uint8_t CPU::daa(const Instruction &instruction) {
     return instruction.cycles;
 }
 
+//#include <iostream>
 void CPU::next() {
 
     // fetch and decode
@@ -1068,6 +1069,8 @@ void CPU::next() {
         registers.write16(PC, static_cast<uint16_t>(currentPC + 1));
         // read next instruction
     }
+
+    //cout << ticks << " : " << hex << currentPC << dec << endl;
 
     if (!isCurrentExtended) {
         // Execute
@@ -1154,10 +1157,22 @@ void CPU::next() {
                         registers.write16(SP, stackPointer);
                         // jump to address
                         registers.write16(PC, static_cast<uint16_t>(0x0040 | (i << 3)));
+                        // Some time must have passed - undocumented
+                        // https://github.com/sinamas/gambatte/blob/master/libgambatte/src/interrupter.cpp
+                        // probably 20 cycles or 24?
+                        ticks += 20;
                         break;
                     }
                 }
             }
         }
     }
+}
+
+void CPU::interrupt(uint8_t irqLine) {
+    mmap.write(0xFF0F, static_cast<uint8_t>(mmap.read(0xFF0F) | (1 << irqLine)));
+}
+
+std::uint32_t CPU::getTicks() const {
+    return ticks;
 }
