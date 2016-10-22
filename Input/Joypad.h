@@ -10,6 +10,15 @@
 
 namespace Gameboy {
     namespace Input {
+
+        enum Register : std::uint16_t {
+            P1 = 0xFF00
+        };
+
+        enum Interrupt : std::uint8_t {
+            JoypadIrq = 4
+        };
+
         class Joypad
             : public General::IReadableWritable
         {
@@ -18,7 +27,7 @@ namespace Gameboy {
             Joypad(CPU::IInterruptible& p_interruptible);
 
             std::uint8_t read(std::uint16_t address) const override;
-            virtual void write(std::uint16_t address, std::uint8_t datum) override;
+            void write(std::uint16_t address, std::uint8_t datum) override;
 
         private:
             CPU::IInterruptible& interruptible;

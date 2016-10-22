@@ -5,6 +5,7 @@
 #include "Memory/MemoryMappedIO.h"
 #include "GPU/GPU.h"
 #include "Input/Joypad.h"
+#include "Timer/Timer.h"
 #include "CPU/CPU.h"
 
 using namespace std;
@@ -12,6 +13,7 @@ using namespace Gameboy::Cartridge;
 using namespace Gameboy::Memory;
 using namespace Gameboy::Input;
 using namespace Gameboy::GPU;
+using namespace Gameboy::Timer;
 using namespace Gameboy::CPU;
 
 int main(int argc, char * argv[]) {
@@ -24,8 +26,10 @@ int main(int argc, char * argv[]) {
         CPU cpu (mmap);
         Joypad joypad (cpu);
         GPU gpu (cpu);
+        Timer timer (cpu);
         mmap.setInput(joypad);
         mmap.setGpu(gpu);
+        mmap.setTimer(timer);
 
         cout << cartridge << endl;
         cout << "Starting Execution" << endl;
@@ -37,6 +41,7 @@ int main(int argc, char * argv[]) {
             duration = cpu.getTicks() - clock;
             //cout << "clock: " << clock << " duration: " << duration << endl;
             gpu.next(duration);
+            timer.next(duration);
         }
         return EXIT_SUCCESS;
     } catch (const exception& ex) {

@@ -23,6 +23,7 @@ file(GLOB_RECURSE SOURCE_FILES
      GPU/*.cpp
      Input/*.cpp
      Memory/*.cpp
+     Timer/*.cpp
 )
 
 add_executable(gameboy main.cpp ${SOURCE_FILES})

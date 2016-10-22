@@ -17,6 +17,7 @@ MemoryMappedIO::MemoryMappedIO(Cartridge::MemoryBankController& p_mbc)
     :
         mbc ( p_mbc ),
         joypad ( nullptr ),
+        timer ( nullptr ),
         interruptEnableRegister (),
         lowMemoryIsCartridge ()
 {
@@ -60,8 +61,10 @@ uint8_t MemoryMappedIO::read(uint16_t address) const {
                     throw runtime_error("Read range error: " + to_string(address));
                 } else if (address < UnusableIO2) {
                     // 0xFF00 - 0xFF4B - Usable I/O
-                    if (address == 0xFF00) {
+                    if (address == Input::P1) {
                         return joypad->read(address);
+                    } else if (address >= Timer::DIV && address <= Timer::TAC) {
+                        return timer->read(address);
                     } else if (address >= GPU::LCDC && address <= GPU::WX) {
                         return gpu->read(address);
                     } else {
@@ -118,8 +121,10 @@ void MemoryMappedIO::write(uint16_t address, uint8_t datum) {
                     throw runtime_error("Write range error: " + to_string(address));
                 } else if (address < UnusableIO2) {
                     // 0xFF00 - 0xFF4B - Usable I/O
-                    if (address == 0xFF00) {
+                    if (address == Input::P1) {
                         return joypad->write(address, datum);
+                    } else if (address >= Timer::DIV && address <= Timer::TAC) {
+                        return timer->write(address, datum);
                     } else if (address >= GPU::LCDC && address <= GPU::WX) {
                         return gpu->write(address, datum);
                     } else {
@@ -153,6 +158,10 @@ void MemoryMappedIO::setInput(Input::Joypad &p_joypad) {
 
 void MemoryMappedIO::setGpu(GPU::GPU &p_gpu) {
     gpu = &p_gpu;
+}
+
+void MemoryMappedIO::setTimer(Timer::Timer &p_timer) {
+    timer = &p_timer;
 }
 
 

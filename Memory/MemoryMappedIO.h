@@ -6,6 +6,7 @@
 #define GAMEBOY_MEMORYMAPPEDIO_H
 
 #include <string>
+#include "Timer/Timer.h"
 #include "GPU/GPU.h"
 #include "Input/Joypad.h"
 #include "Cartridge/Cartridge.h"
@@ -26,6 +27,7 @@ namespace Gameboy {
             void setInput(Input::Joypad &p_joypad);
 
             void setGpu(GPU::GPU &p_gpu);
+            void setTimer(Timer::Timer &p_timer);
 
         private:
             // has rom and its own ram
@@ -35,6 +37,7 @@ namespace Gameboy {
 
             Input::Joypad * joypad;
             GPU::GPU * gpu;
+            Timer::Timer * timer;
             Memory::ReadableWritableMemory ioPorts;
             Memory::ReadableWritableMemory zeroPageRam;
             uint8_t interruptEnableRegister;

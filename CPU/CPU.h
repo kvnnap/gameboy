@@ -24,7 +24,7 @@ namespace Gameboy {
             std::uint32_t getTicks() const;
             void next();
 
-            void interrupt(std::uint8_t irqLine) override;
+            void requestInterrupt(std::uint8_t irqLine) override;
 
         private:
             static const Instruction instructions[256];

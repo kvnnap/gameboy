@@ -13,7 +13,7 @@ namespace Gameboy {
         public:
             virtual ~IInterruptible() {};
 
-            virtual void interrupt(std::uint8_t irqLine) = 0;
+            virtual void requestInterrupt(std::uint8_t irqLine) = 0;
         };
     }
 }

@@ -1145,9 +1145,10 @@ void CPU::next() {
             if (ifr != 0) {
                 // Some interrupt was raised, handle the interrupt
                 for (size_t i = 0; i < 5; ++i) {
-                    if (ifr & (1 << i)) {
+                    const std::uint8_t bitFlag = static_cast<uint8_t>(1 << i);
+                    if ((ier & bitFlag) && (ifr & bitFlag)) {
                         // handle interrupt i, reset IF flag
-                        mmap.write(0xFF0F, static_cast<uint8_t>(ifr & ~(1 << i)));
+                        mmap.write(0xFF0F, static_cast<uint8_t>(ifr & ~bitFlag));
                         interruptMasterEnable = false;
                         // Read stack pointer
                         uint16_t stackPointer = registers.read16(SP);
@@ -1169,7 +1170,7 @@ void CPU::next() {
     }
 }
 
-void CPU::interrupt(uint8_t irqLine) {
+void CPU::requestInterrupt(uint8_t irqLine) {
     mmap.write(0xFF0F, static_cast<uint8_t>(mmap.read(0xFF0F) | (1 << irqLine)));
 }
 

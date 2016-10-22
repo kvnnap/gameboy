@@ -12,13 +12,9 @@ GPU::GPU(Gameboy::CPU::IInterruptible &p_interruptible)
     : interruptible (p_interruptible),
       frameBuffer (160 * 144),
       clock (),
-      lcdcReg (),
-      statReg (OAMUsed),
-      scyReg (),
-      scxReg (),
-      lyReg (),
-      lycReg ()
+      gpuReg ()
 {
+    gpuReg[OffSTAT] = OAMUsed;
     videoRam.initialise(Memory::MemoryType(8192));
     spriteRam.initialise(Memory::MemoryType(160));
 }
@@ -35,7 +31,7 @@ void GPU::next(uint32_t ticks) {
                 // next mode is either mode 1 - VBlank or mode 2 - OAMUsed
                 clock -= 204;
                 incrementLY();
-                if (lyReg == 144) {
+                if (gpuReg[OffLY] == 144) {
                     setMode(VBlank);
                     // Frame is ready, commit it
                 } else {
@@ -47,7 +43,7 @@ void GPU::next(uint32_t ticks) {
             if (clock >= 456) {
                 clock -= 456;
                 incrementLY();
-                if (lyReg == 0) {
+                if (gpuReg[OffLY] == 0) {
                     setMode(OAMUsed);
                 }
             }
@@ -71,67 +67,67 @@ void GPU::next(uint32_t ticks) {
 
 // LCDC
 bool GPU::isLcdOn() const {
-    return (lcdcReg & (1 << 7)) != 0;
+    return (gpuReg[OffLCDC] & (1 << 7)) != 0;
 }
 
 uint16_t GPU::getWindowTileMapOffset() const {
-    return static_cast<uint16_t>((lcdcReg & (1 << 6)) ? 0x9C00 : 0x9800);
+    return static_cast<uint16_t>((gpuReg[OffLCDC] & (1 << 6)) ? 0x9C00 : 0x9800);
 }
 
 bool GPU::isWindowDisplayOn() const {
-    return (lcdcReg & (1 << 5)) != 0;
+    return (gpuReg[OffLCDC] & (1 << 5)) != 0;
 }
 
 uint16_t GPU::getBgWindowTileDataOffset() const {
-    return static_cast<uint16_t>((lcdcReg & (1 << 4)) ? 0x8800 : 0x8000);
+    return static_cast<uint16_t>((gpuReg[OffLCDC] & (1 << 4)) ? 0x8800 : 0x8000);
 }
 
 uint16_t GPU::getBgWindowTileMapOffset() const {
-    return static_cast<uint16_t>((lcdcReg & (1 << 3)) ? 0x9C00 : 0x9800);
+    return static_cast<uint16_t>((gpuReg[OffLCDC] & (1 << 3)) ? 0x9C00 : 0x9800);
 }
 
 uint8_t GPU::getSpriteHeight() const {
-    return static_cast<uint8_t>((lcdcReg & (1 << 2)) ? 16 : 8);
+    return static_cast<uint8_t>((gpuReg[OffLCDC] & (1 << 2)) ? 16 : 8);
 }
 
 bool GPU::isSpriteDisplayOn() const {
-    return (lcdcReg & (1 << 1)) != 0;
+    return (gpuReg[OffLCDC] & (1 << 1)) != 0;
 }
 
 bool GPU::isBgWindowDisplayOn() const {
-    return (lcdcReg & (1 << 0)) != 0;
+    return (gpuReg[OffLCDC] & (1 << 0)) != 0;
 }
 
 // STAT
 void GPU::setMode(Mode mode) {
-    statReg &= 0xFC;
-    statReg |= mode;
-    if ((mode != OAMVRamUsed) && (statReg & (1 << (3 + mode)))) {
-        interruptible.interrupt(StatIrq);
+    gpuReg[OffSTAT] &= 0xFC;
+    gpuReg[OffSTAT] |= mode;
+    if ((mode != OAMVRamUsed) && (gpuReg[OffSTAT] & (1 << (3 + mode)))) {
+        interruptible.requestInterrupt(StatIrq);
     }
     if (mode == VBlank) {
-        interruptible.interrupt(VBlankIrq);
+        interruptible.requestInterrupt(VBlankIrq);
     }
 }
 
 void GPU::incrementLY() {
-    if (++lyReg == 154) {
-        lyReg = 0;
+    if (++gpuReg[OffLY] == 154) {
+        gpuReg[OffLY] = 0;
     }
     // check coincidence flag
-    if (lyReg == lycReg) {
-        statReg |= (1 << 2);
+    if (gpuReg[OffLY] == gpuReg[OffLYC]) {
+        gpuReg[OffSTAT] |= (1 << 2);
         // Check and raise coincidence interrupt
-        if (statReg & (1 << 6)) {
-            interruptible.interrupt(StatIrq);
+        if (gpuReg[OffSTAT] & (1 << 6)) {
+            interruptible.requestInterrupt(StatIrq);
         }
     } else {
-        statReg &= ~(1 << 2);
+        gpuReg[OffSTAT] &= ~(1 << 2);
     }
 }
 
 Mode GPU::getMode() const {
-    return static_cast<Mode>(statReg & 0x03);
+    return static_cast<Mode>(gpuReg[OffSTAT] & 0x03);
 }
 
 uint8_t GPU::read(uint16_t address) const {
@@ -149,7 +145,7 @@ uint8_t GPU::read(uint16_t address) const {
         return spriteRam.readExt(address - SpriteRam);
     } else if (address >= LCDC && address <= WX) {
         // Registers
-        return 144;
+        return gpuReg[address - LCDC];
     }
     throw runtime_error ("GPU read out of range: " + to_string(address));
 }
@@ -169,6 +165,23 @@ void GPU::write(uint16_t address, uint8_t datum) {
         return spriteRam.writeExt(address - SpriteRam, datum);
     } else if (address >= LCDC && address <= WX) {
         // Registers
+        const RegisterOffset offset = static_cast<RegisterOffset>(address - LCDC);
+        switch (offset) {
+            case OffLCDC: // 0xFF40
+            case OffSTAT: // 0xFF41
+            case OffSCY:  // 0xFF42
+            case OffSCX:  // 0xFF43
+            case OffLY:   // 0xFF44
+            case OffLYC:  // 0xFF45
+            case OffDMA:  // 0xFF46
+            case OffBGP:  // 0xFF47
+            case OffOBP0: // 0xFF48
+            case OffOBP1: // 0xFF49
+            case OffWY:   // 0xFF4A
+            case OffWX:   // 0xFF4B
+                gpuReg[offset] = datum;
+            break;
+        }
         return;
     }
     throw runtime_error ("GPU write out of range: " + to_string(address) + ", datum: " + to_string(static_cast<uint32_t>(datum)));

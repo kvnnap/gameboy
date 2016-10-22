@@ -6,22 +6,23 @@
 #include "Joypad.h"
 
 using namespace std;
+using namespace Gameboy::CPU;
 using namespace Gameboy::Input;
 
-Joypad::Joypad(CPU::IInterruptible& p_interruptible)
+Joypad::Joypad(IInterruptible& p_interruptible)
     : interruptible (p_interruptible),
       inputRegister (0x0F)
 {}
 
 uint8_t Joypad::read(uint16_t address) const {
-    if (address == 0xFF00) {
+    if (address == P1) {
         return inputRegister;
     }
     throw runtime_error("Wrong read address for Joypad: " + to_string(address));
 }
 
 void Joypad::write(uint16_t address, uint8_t datum) {
-    if (address == 0xFF00) {
+    if (address == P1) {
         if (datum & 0x10) {
             // read right, left, up, down
         } else if (datum & 0x20) {

@@ -38,6 +38,29 @@ namespace Gameboy {
             WX   = 0xFF4B,  // Window X Position
         };
 
+        enum RegisterOffset : std::uint8_t {
+            OffLCDC = 0x00,     // LCD Control Operation
+            OffSTAT = 0x01,   // LCDC Status - Flip modes on this register
+            OffSCY  = 0x02,   // 8 Bit value $00-$FF to scroll BG Y screen position
+            OffSCX  = 0x03,   // 8 Bit value $00-$FF to scroll BG X screen position
+            OffLY   = 0x04,   // Read only, indicates the vertical line to which
+                                // the present data is transferred to the LCD
+                                // Driver. The LY can take on any value
+                                // between 0 through 153. The values between
+                                // 144 and 153 indicate the V-Blank period.
+                                // Writing will reset the counter.
+            OffLYC  = 0x05,   // The LYC compares itself with the LY. If the
+                                // values are the same it causes the STAT to
+                                // set the coincident flag.
+            OffDMA  = 0x06,   // Write only -  DMA Transfer (40*28 bit) from internal ROM or
+                                // RAM ($0000-$F19F) to the OAM (address $FE00-$FE9F)
+            OffBGP  = 0x07,   // BG & Window Palette Data
+            OffOBP0 = 0x08,   // Object Palette 0 Data
+            OffOBP1 = 0x09,   // Object Palette 1 Data
+            OffWY   = 0x0A,   // Window Y Position
+            OffWX   = 0x0B,   // Window X Position
+        };
+
         enum Mode : std::uint8_t {
             HBlank      = 0x00,
             VBlank      = 0x01,
@@ -60,7 +83,7 @@ namespace Gameboy {
             void next(std::uint32_t ticks) override;
 
             std::uint8_t read(std::uint16_t address) const override;
-            virtual void write(std::uint16_t address, std::uint8_t datum) override;
+            void write(std::uint16_t address, std::uint8_t datum) override;
 
             // LCDC
             bool isLcdOn() const;
@@ -88,12 +111,18 @@ namespace Gameboy {
             std::uint32_t clock;
 
             // Registers
-            std::uint8_t lcdcReg;
-            std::uint8_t statReg;
-            std::uint8_t scyReg;
-            std::uint8_t scxReg;
-            std::uint8_t lyReg;
-            std::uint8_t lycReg;
+            union {
+                struct {
+                    std::uint8_t lcdcReg;
+                    std::uint8_t statReg;
+                    std::uint8_t scyReg;
+                    std::uint8_t scxReg;
+                    std::uint8_t lyReg;
+                    std::uint8_t lycReg;
+                };
+                std::uint8_t gpuReg[12];
+            };
+
 
         };
     }
