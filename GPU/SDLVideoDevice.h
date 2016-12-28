@@ -22,17 +22,22 @@ namespace Gameboy {
                     const std::string& windowName = "Gameboy",
                     uint32_t width = 160,
                     uint32_t height = 144,
-                    bool accelerated = false);
+                    bool accelerated = true);
             virtual ~SDLVideoDevice();
+            void destroy();
+            void sdlFatalError(const std::string &errorMessage);
 
             // IOutputDevice
-            void writeFrame(const std::uint32_t* frameBuffer) override;
+            void render(const std::uint32_t *frameBuffer) override;
 
             // Data
             const std::string windowName;
             const uint32_t width;
             const uint32_t height;
 
+            bool accelerated;
+            bool initialised;
+            bool videoSubsystemInitialised;
             //The SDL Window we'll be rendering to
             SDL_Window* window;
 

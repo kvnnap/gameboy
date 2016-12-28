@@ -12,7 +12,7 @@ namespace Gameboy {
         class IVideoOutputDevice {
         public:
             virtual ~IVideoOutputDevice() {}
-            virtual void writeFrame(const std::uint32_t* frameBuffer) = 0;
+            virtual void render(const std::uint32_t *frameBuffer) = 0;
         };
     }
 }

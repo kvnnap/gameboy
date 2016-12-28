@@ -1,5 +1,6 @@
 #include <iostream>
 #include <stdexcept>
+#include <GPU/SDLVideoDevice.h>
 
 #include "Cartridge/Cartridge.h"
 #include "Memory/MemoryMappedIO.h"
@@ -21,12 +22,19 @@ int main(int argc, char * argv[]) {
         if (argc != 2) {
             throw runtime_error("No file supplied");
         }
+
+        // Load Cartridge
         Cartridge cartridge (argv[1]);
+
+        // Setup Devices
         MemoryMappedIO mmap (cartridge.getMBC());
         CPU cpu (mmap);
         Joypad joypad (cpu);
-        GPU gpu (cpu);
+        SDLVideoDevice sdlVideoDevice;
+        GPU gpu (cpu, sdlVideoDevice);
         Timer timer (cpu);
+
+        // Set Memory Mapped I/O
         mmap.setInput(joypad);
         mmap.setGpu(gpu);
         mmap.setTimer(timer);

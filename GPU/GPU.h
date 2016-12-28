@@ -11,6 +11,7 @@
 #include "General/ITick.h"
 #include "General/Definitions.h"
 #include "Memory/ReadableWritableMemory.h"
+#include "IVideoOutputDevice.h"
 
 namespace Gameboy {
     namespace GPU {
@@ -78,7 +79,7 @@ namespace Gameboy {
         {
         public:
 
-            GPU(CPU::IInterruptible& p_interruptible);
+            GPU(CPU::IInterruptible& p_interruptible, IVideoOutputDevice& p_outputDevice);
 
             void next(std::uint32_t ticks) override;
 
@@ -102,6 +103,7 @@ namespace Gameboy {
 
         private:
             CPU::IInterruptible& interruptible;
+            IVideoOutputDevice& outputDevice;
 
             Memory::ReadableWritableMemory videoRam;  // 0x8000 - 0x9FFF (8KB)
             Memory::ReadableWritableMemory spriteRam; // 0xFE00 - 0xFE9F (160 bytes)

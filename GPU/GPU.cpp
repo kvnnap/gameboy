@@ -8,8 +8,9 @@
 using namespace std;
 using namespace Gameboy::GPU;
 
-GPU::GPU(Gameboy::CPU::IInterruptible &p_interruptible)
+GPU::GPU(Gameboy::CPU::IInterruptible &p_interruptible, IVideoOutputDevice& p_outputDevice)
     : interruptible (p_interruptible),
+      outputDevice (p_outputDevice),
       frameBuffer (160 * 144),
       clock (),
       gpuReg ()
@@ -168,10 +169,18 @@ void GPU::write(uint16_t address, uint8_t datum) {
         const RegisterOffset offset = static_cast<RegisterOffset>(address - LCDC);
         switch (offset) {
             case OffLCDC: // 0xFF40
+                gpuReg[offset] = datum;
+                break;
             case OffSTAT: // 0xFF41
+                gpuReg[offset] &= 0x03;
+                gpuReg[offset] |= datum & 0xFC;
+                break;
             case OffSCY:  // 0xFF42
             case OffSCX:  // 0xFF43
+                gpuReg[offset] = datum;
+                break;
             case OffLY:   // 0xFF44
+                throw runtime_error("Attempted write to LY Register, datum:" + to_string(static_cast<uint32_t>(datum)));
             case OffLYC:  // 0xFF45
             case OffDMA:  // 0xFF46
             case OffBGP:  // 0xFF47

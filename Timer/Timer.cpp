@@ -59,7 +59,7 @@ void Timer::next(uint32_t ticks) {
 
 uint8_t Timer::read(uint16_t address) const {
     if (address >= DIV && address <= TAC) {
-        return timerReg[address];
+        return timerReg[address - DIV];
     }
     throw runtime_error("Wrong read address for Timer: " + to_string(address));
 }
