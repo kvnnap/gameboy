@@ -13,11 +13,11 @@ GPU::GPU(Gameboy::CPU::IInterruptible &p_interruptible, IVideoOutputDevice& p_ou
       outputDevice (p_outputDevice),
       frameBuffer (160 * 144),
       clock (),
-      gpuReg ()
+      gpuReg (),
+      colors {0xFFFFFFFF, 0xFFC0C0C0, 0xFF606060, 0xFF000000}
 {
     gpuReg[OffSTAT] = OAMUsed;
     videoRam.initialise(Memory::MemoryType(8192));
-    spriteRam.initialise(Memory::MemoryType(160));
 }
 
 void GPU::next(uint32_t ticks) {
@@ -33,6 +33,7 @@ void GPU::next(uint32_t ticks) {
                 clock -= 204;
                 incrementLY();
                 if (gpuReg[OffLY] == 144) {
+                    outputDevice.render(frameBuffer.data());
                     setMode(VBlank);
                     // Frame is ready, commit it
                 } else {
@@ -58,6 +59,8 @@ void GPU::next(uint32_t ticks) {
             break;
         case OAMVRamUsed:
             if (clock >= 172) {
+                // render scanLine
+                renderScanLine();
                 // next mode is mode 0 - HBlank
                 clock -= 172;
                 setMode(HBlank);
@@ -80,11 +83,11 @@ bool GPU::isWindowDisplayOn() const {
 }
 
 uint16_t GPU::getBgWindowTileDataOffset() const {
-    return static_cast<uint16_t>((gpuReg[OffLCDC] & (1 << 4)) ? 0x8800 : 0x8000);
+    return static_cast<uint16_t>((gpuReg[OffLCDC] & (1 << 4)) ? 0x8800 : 0x8000) - VideoRam;
 }
 
 uint16_t GPU::getBgWindowTileMapOffset() const {
-    return static_cast<uint16_t>((gpuReg[OffLCDC] & (1 << 3)) ? 0x9C00 : 0x9800);
+    return static_cast<uint16_t>((gpuReg[OffLCDC] & (1 << 3)) ? 0x9C00 : 0x9800) - VideoRam;
 }
 
 uint8_t GPU::getSpriteHeight() const {
@@ -195,3 +198,44 @@ void GPU::write(uint16_t address, uint8_t datum) {
     }
     throw runtime_error ("GPU write out of range: " + to_string(address) + ", datum: " + to_string(static_cast<uint32_t>(datum)));
 }
+
+void GPU::renderScanLine() {
+    // Tile map!
+    const uint16_t mapOffset = getBgWindowTileMapOffset();
+    const uint16_t dataOffset = getBgWindowTileDataOffset();
+    const bool negativeAddressing = dataOffset != 0;
+
+    // Pixel offsets
+    const uint8_t xOffset = gpuReg[OffSCX];
+    const uint8_t yOffset = gpuReg[OffSCY] + gpuReg[OffLY];
+
+    // Tile offsets
+    const uint8_t yTileOffset = yOffset >> 3; // Divide by 8
+    const uint8_t tileLineIndex = yOffset & static_cast<uint8_t>(0x07);
+
+    for (uint8_t x = 0; x < 160; ++x) {
+        uint8_t xVal = xOffset + x;
+        uint8_t xTileOffset = xVal >> 3;
+
+        // Get tile number - multiply yTileOffset by 32
+        uint8_t tileNumber = videoRam.readExt(mapOffset + (yTileOffset << 5) + xTileOffset);
+
+        // Get tile address
+        uint16_t tileAddress = negativeAddressing ? (dataOffset + static_cast<int8_t>(tileNumber)) : dataOffset + tileNumber;
+
+        // Tile x-Pixel Index
+        const uint8_t tileXPixelIndex = xVal & static_cast<uint8_t>(0x07);
+
+        // Get 2-bit value
+        uint16_t finalAddress = tileAddress + (tileLineIndex << 1);
+        uint8_t pixelValue = static_cast<uint8_t >((videoRam.readExt(finalAddress + 1) & (1 << (7 - tileXPixelIndex))) ? 2 : 0);
+        pixelValue |= (videoRam.readExt(finalAddress) >> (7 - tileXPixelIndex)) & 1;
+
+        // Get palette colour value
+        uint8_t colorIndexValue = static_cast<uint8_t >((gpuReg[OffBGP] >> (pixelValue << 1)) & 0x03);
+
+        // Commit to framebuffer
+        frameBuffer[gpuReg[OffLY] * 160 + x] = colors[colorIndexValue];
+    }
+}
+

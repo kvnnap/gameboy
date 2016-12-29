@@ -86,20 +86,7 @@ namespace Gameboy {
             std::uint8_t read(std::uint16_t address) const override;
             void write(std::uint16_t address, std::uint8_t datum) override;
 
-            // LCDC
-            bool isLcdOn() const;
-            std::uint16_t getWindowTileMapOffset() const;
-            bool isWindowDisplayOn() const;
-            std::uint16_t getBgWindowTileDataOffset() const;
-            std::uint16_t getBgWindowTileMapOffset() const;
-            std::uint8_t getSpriteHeight() const;
-            bool isSpriteDisplayOn() const;
-            bool isBgWindowDisplayOn() const;
 
-            // STAT
-            void setMode(Mode mode);
-            Mode getMode() const;
-            void incrementLY();
 
         private:
             CPU::IInterruptible& interruptible;
@@ -125,7 +112,27 @@ namespace Gameboy {
                 std::uint8_t gpuReg[12];
             };
 
+            uint32_t colors[4];
 
+            // Methods
+
+            // LCDC
+            bool isLcdOn() const;
+            std::uint16_t getWindowTileMapOffset() const;
+            bool isWindowDisplayOn() const;
+            std::uint16_t getBgWindowTileDataOffset() const;
+            std::uint16_t getBgWindowTileMapOffset() const;
+            std::uint8_t getSpriteHeight() const;
+            bool isSpriteDisplayOn() const;
+            bool isBgWindowDisplayOn() const;
+
+            // STAT
+            void setMode(Mode mode);
+            Mode getMode() const;
+            void incrementLY();
+
+            // render
+            void renderScanLine();
         };
     }
 }
