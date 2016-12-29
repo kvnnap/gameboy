@@ -28,7 +28,9 @@ uint8_t MemoryBankController::read(uint16_t address) const {
 }
 
 void MemoryBankController::write(uint16_t address, uint8_t datum) {
-    if (address >= 0x2000 && address < MemoryMap::RomBankN){
+    if (address >= 0 && address < 0x2000) {
+        // ignore
+    } else  if (address >= 0x2000 && address < MemoryMap::RomBankN){
         if (datum > 1) {
             throw runtime_error("MBC: Invalid Rom Bank Select, Value: " + to_string(datum));
         }

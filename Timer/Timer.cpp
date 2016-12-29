@@ -83,6 +83,7 @@ void Timer::write(uint16_t address, uint8_t datum) {
                 }
                 break;
         }
+    } else {
+        throw runtime_error("Wrong write address for Timer: " + to_string(address));
     }
-    throw runtime_error("Wrong write address for Timer: " + to_string(address));
 }
