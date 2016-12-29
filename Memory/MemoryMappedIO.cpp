@@ -118,7 +118,7 @@ void MemoryMappedIO::write(uint16_t address, uint8_t datum) {
                     return gpu->write(address, datum);
                 } else if (address < IOPorts) {
                     // 0xFEA0 - 0xFEFF - Unusable
-                    throw runtime_error("Write range error: " + to_string(address));
+                    //throw runtime_error("Write range error: " + to_string(address));
                 } else if (address < UnusableIO2) {
                     // 0xFF00 - 0xFF4B - Usable I/O
                     if (address == Input::P1) {
@@ -138,7 +138,7 @@ void MemoryMappedIO::write(uint16_t address, uint8_t datum) {
                     if (address == 0xFF50) {
                         lowMemoryIsCartridge = datum;
                     }
-                    throw runtime_error("Write range error: " + to_string(address));
+                    //throw runtime_error("Write range error: " + to_string(address));
                 } else if (address < IntEnableReg) {
                     // 0xFF80 - 0xFFFE - Zero Page Ram
                     return zeroPageRam.writeExt(address - ZeroPageRam, datum);
@@ -146,6 +146,7 @@ void MemoryMappedIO::write(uint16_t address, uint8_t datum) {
                     // 0xFFFF - 0xFFFF - Interrupt Enable Register
                     interruptEnableRegister = datum;
                 }
+                break;
             default:
                 throw runtime_error("Write range error: " + to_string(address));
         }

@@ -28,7 +28,11 @@ uint8_t MemoryBankController::read(uint16_t address) const {
 }
 
 void MemoryBankController::write(uint16_t address, uint8_t datum) {
-    if (address >= MemoryMap::RamBankN && address < MemoryMap::InternalRam) {
+    if (address >= 0x2000 && address < MemoryMap::RomBankN){
+        if (datum > 1) {
+            throw runtime_error("MBC: Invalid Rom Bank Select, Value: " + to_string(datum));
+        }
+    } else if (address >= MemoryMap::RamBankN && address < MemoryMap::InternalRam) {
         ram.writeExt(address - MemoryMap::RamBankN, datum);
     } else {
         throw runtime_error("MBC: Invalid Write Address - " + to_string(address));

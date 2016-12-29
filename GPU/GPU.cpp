@@ -18,6 +18,7 @@ GPU::GPU(Gameboy::CPU::IInterruptible &p_interruptible, IVideoOutputDevice& p_ou
 {
     gpuReg[OffSTAT] = OAMUsed;
     videoRam.initialise(Memory::MemoryType(8192));
+    spriteRam.initialise(Memory::MemoryType(160));
 }
 
 void GPU::next(uint32_t ticks) {
@@ -83,7 +84,8 @@ bool GPU::isWindowDisplayOn() const {
 }
 
 uint16_t GPU::getBgWindowTileDataOffset() const {
-    return static_cast<uint16_t>((gpuReg[OffLCDC] & (1 << 4)) ? 0x8800 : 0x8000) - VideoRam;
+    // When 9000, signed addressing is used then (0x8800 - 0x8FFF)
+    return static_cast<uint16_t>((gpuReg[OffLCDC] & (1 << 4)) ? 0x9000 : 0x8000) - VideoRam;
 }
 
 uint16_t GPU::getBgWindowTileMapOffset() const {
@@ -221,7 +223,7 @@ void GPU::renderScanLine() {
         uint8_t tileNumber = videoRam.readExt(mapOffset + (yTileOffset << 5) + xTileOffset);
 
         // Get tile address
-        uint16_t tileAddress = negativeAddressing ? (dataOffset + static_cast<int8_t>(tileNumber)) : dataOffset + tileNumber;
+        uint16_t tileAddress = dataOffset + negativeAddressing ? (static_cast<int8_t>(tileNumber) << 4) : tileNumber << 4;
 
         // Tile x-Pixel Index
         const uint8_t tileXPixelIndex = xVal & static_cast<uint8_t>(0x07);
