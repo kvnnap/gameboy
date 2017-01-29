@@ -101,4 +101,7 @@ void SDLVideoDevice::render(const std::uint32_t *frameBuffer) {
     SDL_UpdateTexture(texture, nullptr, frameBuffer, width * sizeof(*frameBuffer));
     SDL_RenderCopy(renderer, texture, nullptr, nullptr);
     SDL_RenderPresent(renderer);
+    // Quick fix
+    SDL_Event e;
+    while( SDL_PollEvent( &e ) != 0 ) {}
 }
