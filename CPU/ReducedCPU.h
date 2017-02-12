@@ -37,6 +37,14 @@ namespace Gameboy {
 
             uint32_t ticks;
 
+            // Implementations
+            void add_val8_to_reg8_nc_c(std::uint8_t srcValue, bool carry);
+            void sub_val8_from_reg8_nc_c(std::uint8_t srcValue, bool carry);
+            void and_val8_to_reg8(std::uint8_t srcValue);
+            void xor_val8_to_reg8(std::uint8_t srcValue);
+            void or_val8_to_reg8(std::uint8_t srcValue);
+            void cp_val8_to_reg8(std::uint8_t srcValue);
+
             // Prefix CB Implementations
             std::uint8_t s_l_r_a_l_val8(std::uint8_t val);
             std::uint8_t r_l_r_c_val8(std::uint8_t val);

@@ -91,8 +91,47 @@ void ReducedCPU::next() {
             ticks += isMemoryOperation || isDestMemoryOperation ? 8 : 4;
 
         } else if (rangeNum == 2) {
+
+            // Increment Program Counter by 1
+            registers.write16(PC, static_cast<uint16_t>(currentPC + 1));
+
             // ADD, ADC, SUB, SBC, AND, XOR, OR, CP
-            throw runtime_error ("instruction not yet implemented");
+            const uint8_t rowSelector = destCpuMapIndex >> 1;
+            const bool carryOrDualOperation = (destCpuMapIndex & 0x01) == 0x01;
+            const uint8_t readValue = isMemoryOperation ? mmap.read(registers.read16(regIndex)) : registers.reg[regIndex];
+
+            switch (rowSelector) {
+                case 0: // ADD/ADC
+                    add_val8_to_reg8_nc_c(readValue, carryOrDualOperation);
+                    break;
+                case 1: // SUB/SBC
+                    sub_val8_from_reg8_nc_c(readValue, carryOrDualOperation);
+                    break;
+                case 2: // AND/XOR
+                    if (carryOrDualOperation) {
+                        // XOR
+                        xor_val8_to_reg8(readValue);
+                    } else {
+                        // AND
+                        and_val8_to_reg8(readValue);
+                    }
+                    break;
+                case 3: // OR/CP
+                    if (carryOrDualOperation) {
+                        // CP
+                        cp_val8_to_reg8(readValue);
+                    } else {
+                        // OR
+                        or_val8_to_reg8(readValue);
+                    }
+                    break;
+                default:
+                    throw runtime_error ("Code that should never be reached was reached");
+            }
+
+            // ticks for loads
+            ticks += isMemoryOperation ? 8 : 4;
+
         } else {
             throw runtime_error ("instruction not yet implemented");
         }
@@ -189,6 +228,96 @@ void ReducedCPU::next() {
 }
 
 // Instructions
+
+// 8-bit ADD/ADC
+void ReducedCPU::add_val8_to_reg8_nc_c(uint8_t srcValue, bool carry) {
+    uint8_t destRegValue = registers.reg[A];
+    uint8_t carryValue = 0;
+    uint8_t result = srcValue + destRegValue;
+    if (carry && (registers.reg[F] & CarryFlag)) {
+        result += ++carryValue;
+    }
+    registers.reg[A] = result;
+
+    // update flags
+    registers.reg[F] &= ~(ZeroFlag | SubtractFlag | HalfCarryFlag | CarryFlag);
+    if (result == 0) {
+        registers.reg[F] |= ZeroFlag;
+    }
+    if (((srcValue & 0x0F) + (destRegValue & 0x0F) + carryValue) & 0x10) {
+        registers.reg[F] |= HalfCarryFlag;
+    }
+    if ((static_cast<uint16_t>(srcValue) + destRegValue + carryValue) & 0x100) {
+        registers.reg[F] |= CarryFlag;
+    }
+}
+
+// 8-bit SUB/SBC
+void ReducedCPU::sub_val8_from_reg8_nc_c(uint8_t srcValue, bool carry) {
+    uint8_t destRegValue = registers.reg[A];
+    uint8_t carryValue = 0;
+    uint8_t result = destRegValue - srcValue;
+    if (carry && (registers.reg[F] & CarryFlag)) {
+        result -= ++carryValue;
+    }
+    registers.reg[A] = result;
+
+    // update flags
+    registers.reg[F] &= ~(ZeroFlag | HalfCarryFlag | CarryFlag);
+    registers.reg[F] |= SubtractFlag;
+    if (result == 0) {
+        registers.reg[F] |= ZeroFlag;
+    }
+    if (((destRegValue & 0x0F) < ((srcValue & 0x0F) + carryValue))) {
+        registers.reg[F] |= HalfCarryFlag;
+    }
+    if (destRegValue < (static_cast<uint16_t>(srcValue) + carryValue)) {
+        registers.reg[F] |= CarryFlag;
+    }
+}
+
+// 8-bit AND
+void ReducedCPU::and_val8_to_reg8(uint8_t srcValue) {
+    registers.reg[F] &= ~(ZeroFlag | SubtractFlag | CarryFlag);
+    registers.reg[F] |= HalfCarryFlag;
+    if ((registers.reg[A] &= srcValue) == 0) {
+        registers.reg[F] |= ZeroFlag;
+    }
+}
+
+// 8-bit XOR
+void ReducedCPU::xor_val8_to_reg8(uint8_t srcValue) {
+    registers.reg[F] &= ~(ZeroFlag | SubtractFlag | HalfCarryFlag | CarryFlag);
+    if ((registers.reg[A] ^= srcValue) == 0) {
+        registers.reg[F] |= ZeroFlag;
+    }
+}
+
+// 8-bit OR
+void ReducedCPU::or_val8_to_reg8(uint8_t srcValue) {
+    registers.reg[F] &= ~(ZeroFlag | SubtractFlag | HalfCarryFlag | CarryFlag);
+    if ((registers.reg[A] |= srcValue) == 0) {
+        registers.reg[F] |= ZeroFlag;
+    }
+}
+
+// 8-bit CP
+void ReducedCPU::cp_val8_to_reg8(uint8_t srcValue) {
+    const uint8_t destRegValue = registers.reg[A];
+
+    // update flags
+    registers.reg[F] &= ~(ZeroFlag | HalfCarryFlag | CarryFlag);
+    registers.reg[F] |= SubtractFlag;
+    if (destRegValue == srcValue) {
+        registers.reg[F] |= ZeroFlag;
+    }
+    if (((destRegValue & 0x0F) < ((srcValue & 0x0F)))) {
+        registers.reg[F] |= HalfCarryFlag;
+    }
+    if (destRegValue < (static_cast<uint16_t>(srcValue))) {
+        registers.reg[F] |= CarryFlag;
+    }
+}
 
 // Extended - Shifts
 uint8_t ReducedCPU::s_l_r_a_l_val8(uint8_t val) {
