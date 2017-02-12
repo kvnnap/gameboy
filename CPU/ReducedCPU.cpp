@@ -53,18 +53,56 @@ void ReducedCPU::next() {
     }
 
     // Decode and Execute
+    const uint8_t rangeNum = static_cast<uint8_t>((currentInstruction >> 6) & 0x03);
+    const uint8_t regCpuMapIndex = static_cast<uint8_t>(currentInstruction & 0x07);
+    const uint8_t regIndex = regMap[regCpuMapIndex];
+    const bool isMemoryOperation = regCpuMapIndex == 0x06;
+
     if (!isCurrentExtended) {
         // TODO: Implement
+
+        const uint8_t destCpuMapIndex = static_cast<uint8_t>((currentInstruction >> 3) & 0x07);
+
+        // Loads
+        if (rangeNum == 1) {
+
+            // Decode
+            const uint8_t destRegIndex = regMap[destCpuMapIndex];
+            const bool isDestMemoryOperation = destCpuMapIndex == 0x06;
+
+            // Increment Program Counter by 1 (Loads are byte long)
+            registers.write16(PC, static_cast<uint16_t>(currentPC + 1));
+
+            // Further decode and execute Load
+            if (isDestMemoryOperation) {
+                if (isMemoryOperation) {
+                    // HALT - 0x76
+                    ticks += 4;
+                    throw runtime_error ("HALT instruction not yet implemented");
+                } else {
+                    mmap.write(registers.read16(destRegIndex), registers.reg[regIndex]);
+                }
+            } else {
+                registers.reg[destRegIndex] = isMemoryOperation ? mmap.read(registers.read16(regIndex))
+                                                                : registers.reg[regIndex];
+            }
+
+            // ticks for loads
+            ticks += isMemoryOperation || isDestMemoryOperation ? 8 : 4;
+
+        } else if (rangeNum == 2) {
+            // ADD, ADC, SUB, SBC, AND, XOR, OR, CP
+            throw runtime_error ("instruction not yet implemented");
+        } else {
+            throw runtime_error ("instruction not yet implemented");
+        }
+
         // Increment Program Counter before executing instruction
         registers.write16(PC, static_cast<uint16_t>(currentPC + 0));
         // Execute
         ticks += 0;
     } else {
         // Extended (CB) instructions - rangeNum might be more expensive
-        const uint8_t rangeNum = static_cast<uint8_t>((currentInstruction >> 6) & 0x03);
-        const uint8_t regCpuMapIndex = static_cast<uint8_t>(currentInstruction & 0x07);
-        const uint8_t regIndex = regMap[regCpuMapIndex];
-        const bool isMemoryOperation = regCpuMapIndex == 0x06;
 
         // Prepare variables for memory operation, read data and address
         uint16_t address;

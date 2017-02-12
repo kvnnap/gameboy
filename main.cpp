@@ -8,6 +8,7 @@
 #include "Input/Joypad.h"
 #include "Timer/Timer.h"
 #include "CPU/CPU.h"
+#include "CPU/ReducedCPU.h"
 
 using namespace std;
 using namespace Gameboy::Cartridge;
@@ -28,7 +29,7 @@ int main(int argc, char * argv[]) {
 
         // Setup Devices
         MemoryMappedIO mmap (cartridge.getMBC());
-        CPU cpu (mmap);
+        ReducedCPU cpu (mmap);
         Joypad joypad (cpu);
         SDLVideoDevice sdlVideoDevice;
         GPU gpu (cpu, sdlVideoDevice);
