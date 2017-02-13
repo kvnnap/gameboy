@@ -27,6 +27,7 @@ namespace Gameboy {
 
         private:
             static const uint8_t regMap[8];
+            static const uint8_t reg16Map[4];
 
             Registers registers;
             Memory::MemoryMappedIO& mmap;

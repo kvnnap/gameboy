@@ -13,6 +13,7 @@ using namespace Gameboy::General;
 using namespace Gameboy::CPU;
 
 const uint8_t Gameboy::CPU::ReducedCPU::regMap[8] = {B, C, D, E, H, L, HL, A};
+const uint8_t Gameboy::CPU::ReducedCPU::reg16Map[4] = {BC, DE, HL, HL};
 
 ReducedCPU::ReducedCPU(Memory::MemoryMappedIO &p_mmap)
     : mmap ( p_mmap ),
@@ -63,83 +64,138 @@ void ReducedCPU::next() {
 
         const uint8_t destCpuMapIndex = static_cast<uint8_t>((currentInstruction >> 3) & 0x07);
 
-        // Loads
-        if (rangeNum == 1) {
+        switch (rangeNum) {
+            case 0:
+            {
+                const uint8_t rowSelector = destCpuMapIndex >> 1;
+                // 8- bit loads
+                if ((currentInstruction & 0x03) == 0x02) {
+                    const bool memoryBasedLoads = (currentInstruction & 0x04) == 0;
+                    if (memoryBasedLoads) { // LD (xx), A
+                        // Increment Program Counter by 1 (Loads are byte long)
+                        registers.write16(PC, static_cast<uint16_t>(currentPC + 1));
 
-            // Decode
-            const uint8_t destRegIndex = regMap[destCpuMapIndex];
-            const bool isDestMemoryOperation = destCpuMapIndex == 0x06;
+                        // determine register containing destination pointer - BC, DE, HL+, HL-
+                        const uint8_t reg16Index = reg16Map[rowSelector];
 
-            // Increment Program Counter by 1 (Loads are byte long)
-            registers.write16(PC, static_cast<uint16_t>(currentPC + 1));
+                        uint16_t regAddress = registers.read16(reg16Index);
 
-            // Further decode and execute Load
-            if (isDestMemoryOperation) {
-                if (isMemoryOperation) {
-                    // HALT - 0x76
-                    ticks += 4;
-                    throw runtime_error ("HALT instruction not yet implemented");
-                } else {
-                    mmap.write(registers.read16(destRegIndex), registers.reg[regIndex]);
+                        if (currentInstruction & 0x08) { // LD A, (xx)
+                            registers.reg[A] = mmap.read(regAddress);
+                        } else { // LD (xx), A
+                            mmap.write(regAddress, registers.reg[A]);
+
+                        }
+
+                        // With Increment/Dec
+                        if (rowSelector >= 2) {
+                            registers.write16(reg16Index, rowSelector == 2 ? ++regAddress : --regAddress);
+                        }
+
+                        ticks += 4;
+                    } else {
+
+                        const uint8_t destRegIndex = regMap[destCpuMapIndex];
+                        const bool isDestMemoryOperation = destCpuMapIndex == 0x06;
+
+                        // Increment Program Counter by 2
+                        registers.write16(PC, static_cast<uint16_t>(currentPC + 2));
+
+                        // LD X, d8 - 8-bit immediate
+                        if (isDestMemoryOperation) {
+                            mmap.write(registers.read16(destRegIndex), mmap.read(static_cast<uint16_t>(currentPC + 1)));
+                            ticks += 12;
+                        } else {
+                            registers.reg[destRegIndex] = mmap.read(static_cast<uint16_t>(currentPC + 1));
+                            ticks += 8;
+                        }
+
+                    }
                 }
-            } else {
-                registers.reg[destRegIndex] = isMemoryOperation ? mmap.read(registers.read16(regIndex))
-                                                                : registers.reg[regIndex];
+            }
+                break;
+            // Loads
+            case 1:
+            {
+                // Decode
+                const uint8_t destRegIndex = regMap[destCpuMapIndex];
+                const bool isDestMemoryOperation = destCpuMapIndex == 0x06;
+
+                // Increment Program Counter by 1 (Loads are byte long)
+                registers.write16(PC, static_cast<uint16_t>(currentPC + 1));
+
+                // Further decode and execute Load
+                if (isDestMemoryOperation) {
+                    if (isMemoryOperation) {
+                        // HALT - 0x76
+                        ticks += 4;
+                        throw runtime_error("HALT instruction not yet implemented");
+                    } else {
+                        mmap.write(registers.read16(destRegIndex), registers.reg[regIndex]);
+                    }
+                } else {
+                    registers.reg[destRegIndex] = isMemoryOperation ? mmap.read(registers.read16(regIndex))
+                                                                    : registers.reg[regIndex];
+                }
+
+                // ticks for loads
+                ticks += isMemoryOperation || isDestMemoryOperation ? 8 : 4;
             }
 
-            // ticks for loads
-            ticks += isMemoryOperation || isDestMemoryOperation ? 8 : 4;
+                break;
+            case 2:
+            {
+                // Increment Program Counter by 1
+                registers.write16(PC, static_cast<uint16_t>(currentPC + 1));
 
-        } else if (rangeNum == 2) {
+                // ADD, ADC, SUB, SBC, AND, XOR, OR, CP
+                const uint8_t rowSelector = destCpuMapIndex >> 1;
+                const bool carryOrDualOperation = (destCpuMapIndex & 0x01) == 0x01;
+                const uint8_t readValue = isMemoryOperation ? mmap.read(registers.read16(regIndex))
+                                                            : registers.reg[regIndex];
 
-            // Increment Program Counter by 1
-            registers.write16(PC, static_cast<uint16_t>(currentPC + 1));
+                switch (rowSelector) {
+                    case 0: // ADD/ADC
+                        add_val8_to_reg8_nc_c(readValue, carryOrDualOperation);
+                        break;
+                    case 1: // SUB/SBC
+                        sub_val8_from_reg8_nc_c(readValue, carryOrDualOperation);
+                        break;
+                    case 2: // AND/XOR
+                        if (carryOrDualOperation) {
+                            // XOR
+                            xor_val8_to_reg8(readValue);
+                        } else {
+                            // AND
+                            and_val8_to_reg8(readValue);
+                        }
+                        break;
+                    case 3: // OR/CP
+                        if (carryOrDualOperation) {
+                            // CP
+                            cp_val8_to_reg8(readValue);
+                        } else {
+                            // OR
+                            or_val8_to_reg8(readValue);
+                        }
+                        break;
+                    default:
+                        throw runtime_error("Code that should never be reached was reached");
+                }
 
-            // ADD, ADC, SUB, SBC, AND, XOR, OR, CP
-            const uint8_t rowSelector = destCpuMapIndex >> 1;
-            const bool carryOrDualOperation = (destCpuMapIndex & 0x01) == 0x01;
-            const uint8_t readValue = isMemoryOperation ? mmap.read(registers.read16(regIndex)) : registers.reg[regIndex];
-
-            switch (rowSelector) {
-                case 0: // ADD/ADC
-                    add_val8_to_reg8_nc_c(readValue, carryOrDualOperation);
-                    break;
-                case 1: // SUB/SBC
-                    sub_val8_from_reg8_nc_c(readValue, carryOrDualOperation);
-                    break;
-                case 2: // AND/XOR
-                    if (carryOrDualOperation) {
-                        // XOR
-                        xor_val8_to_reg8(readValue);
-                    } else {
-                        // AND
-                        and_val8_to_reg8(readValue);
-                    }
-                    break;
-                case 3: // OR/CP
-                    if (carryOrDualOperation) {
-                        // CP
-                        cp_val8_to_reg8(readValue);
-                    } else {
-                        // OR
-                        or_val8_to_reg8(readValue);
-                    }
-                    break;
-                default:
-                    throw runtime_error ("Code that should never be reached was reached");
+                // ticks for loads
+                ticks += isMemoryOperation ? 8 : 4;
             }
-
-            // ticks for loads
-            ticks += isMemoryOperation ? 8 : 4;
-
-        } else {
-            throw runtime_error ("instruction not yet implemented");
+                break;
+            default:
+                throw runtime_error ("instruction not yet implemented");
+                break;
         }
 
         // Increment Program Counter before executing instruction
-        registers.write16(PC, static_cast<uint16_t>(currentPC + 0));
+        //registers.write16(PC, static_cast<uint16_t>(currentPC + 0));
         // Execute
-        ticks += 0;
+        //ticks += 0;
     } else {
         // Extended (CB) instructions - rangeNum might be more expensive
 
