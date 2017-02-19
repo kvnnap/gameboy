@@ -13,7 +13,27 @@ using namespace Gameboy::General;
 using namespace Gameboy::CPU;
 
 const uint8_t Gameboy::CPU::ReducedCPU::regMap[8] = {B, C, D, E, H, L, HL, A};
-const uint8_t Gameboy::CPU::ReducedCPU::reg16Map[4] = {BC, DE, HL, HL};
+const uint8_t Gameboy::CPU::ReducedCPU::reg16Map[4] = {BC, DE, HL, SP};
+const uint8_t Gameboy::CPU::ReducedCPU::reg16MapLdInc[4] = {BC, DE, HL, HL};
+
+const ReducedInstruction Gameboy::CPU::ReducedCPU::instructions[16] = {
+        {&ReducedCPU::brancher_nop_stop_jmp_ld, nullptr},               // 0xX0
+        {&ReducedCPU::load_d16_to_reg, &reg16Map},                      // 0xX1
+        {&ReducedCPU::load_reg8_to_regpt_vv_inc_dec, &reg16MapLdInc},   // 0xX2
+        {&ReducedCPU::inc_dec_reg16, &reg16Map},                        // 0xX3
+        {&ReducedCPU::inc_dec_reg8_or_regpt, nullptr},                  // 0xX4
+        {&ReducedCPU::inc_dec_reg8_or_regpt, nullptr},                  // 0xX5
+        {&ReducedCPU::load_d8_to_reg8_or_regpt, nullptr},               // 0xX6
+        {&ReducedCPU::brancher_r_l_r_c_cpl_c_daa_scf, nullptr},         // 0xX7
+        {&ReducedCPU::brancher_nop_stop_jmp_ld, nullptr},               // 0xX8
+        {&ReducedCPU::add_reg16_to_reg16_HL, &reg16Map},                // 0xX9
+        {&ReducedCPU::load_reg8_to_regpt_vv_inc_dec, &reg16MapLdInc},   // 0xXA
+        {&ReducedCPU::inc_dec_reg16, &reg16Map},                        // 0xXB
+        {&ReducedCPU::inc_dec_reg8_or_regpt, nullptr},                  // 0xXC
+        {&ReducedCPU::inc_dec_reg8_or_regpt, nullptr},                  // 0xXD
+        {&ReducedCPU::load_d8_to_reg8_or_regpt, nullptr},               // 0xXE
+        {&ReducedCPU::brancher_r_l_r_c_cpl_c_daa_scf, nullptr}          // 0xXF
+};
 
 ReducedCPU::ReducedCPU(Memory::MemoryMappedIO &p_mmap)
     : mmap ( p_mmap ),
@@ -62,64 +82,22 @@ void ReducedCPU::next() {
     if (!isCurrentExtended) {
         // TODO: Implement
 
-        const uint8_t destCpuMapIndex = static_cast<uint8_t>((currentInstruction >> 3) & 0x07);
+        splitRowSelector = static_cast<uint8_t>((currentInstruction >> 3) & 0x07);
 
         switch (rangeNum) {
             case 0:
             {
-                const uint8_t rowSelector = destCpuMapIndex >> 1;
-                // 8- bit loads
-                if ((currentInstruction & 0x03) == 0x02) {
-                    const bool memoryBasedLoads = (currentInstruction & 0x04) == 0;
-                    if (memoryBasedLoads) { // LD (xx), A
-                        // Increment Program Counter by 1 (Loads are byte long)
-                        registers.write16(PC, static_cast<uint16_t>(currentPC + 1));
-
-                        // determine register containing destination pointer - BC, DE, HL+, HL-
-                        const uint8_t reg16Index = reg16Map[rowSelector];
-
-                        uint16_t regAddress = registers.read16(reg16Index);
-
-                        if (currentInstruction & 0x08) { // LD A, (xx)
-                            registers.reg[A] = mmap.read(regAddress);
-                        } else { // LD (xx), A
-                            mmap.write(regAddress, registers.reg[A]);
-
-                        }
-
-                        // With Increment/Dec
-                        if (rowSelector >= 2) {
-                            registers.write16(reg16Index, rowSelector == 2 ? ++regAddress : --regAddress);
-                        }
-
-                        ticks += 4;
-                    } else {
-
-                        const uint8_t destRegIndex = regMap[destCpuMapIndex];
-                        const bool isDestMemoryOperation = destCpuMapIndex == 0x06;
-
-                        // Increment Program Counter by 2
-                        registers.write16(PC, static_cast<uint16_t>(currentPC + 2));
-
-                        // LD X, d8 - 8-bit immediate
-                        if (isDestMemoryOperation) {
-                            mmap.write(registers.read16(destRegIndex), mmap.read(static_cast<uint16_t>(currentPC + 1)));
-                            ticks += 12;
-                        } else {
-                            registers.reg[destRegIndex] = mmap.read(static_cast<uint16_t>(currentPC + 1));
-                            ticks += 8;
-                        }
-
-                    }
-                }
+                rowSelector = splitRowSelector >> 1;
+                const ReducedInstruction * instruction = &instructions[currentInstruction & 0x0F];
+                ticks += (this->*instruction->execfn)(*instruction);
             }
                 break;
             // Loads
             case 1:
             {
                 // Decode
-                const uint8_t destRegIndex = regMap[destCpuMapIndex];
-                const bool isDestMemoryOperation = destCpuMapIndex == 0x06;
+                const uint8_t destRegIndex = regMap[splitRowSelector];
+                const bool isDestMemoryOperation = splitRowSelector == 0x06;
 
                 // Increment Program Counter by 1 (Loads are byte long)
                 registers.write16(PC, static_cast<uint16_t>(currentPC + 1));
@@ -149,8 +127,8 @@ void ReducedCPU::next() {
                 registers.write16(PC, static_cast<uint16_t>(currentPC + 1));
 
                 // ADD, ADC, SUB, SBC, AND, XOR, OR, CP
-                const uint8_t rowSelector = destCpuMapIndex >> 1;
-                const bool carryOrDualOperation = (destCpuMapIndex & 0x01) == 0x01;
+                const uint8_t rowSelector = splitRowSelector >> 1;
+                const bool carryOrDualOperation = (splitRowSelector & 0x01) == 0x01;
                 const uint8_t readValue = isMemoryOperation ? mmap.read(registers.read16(regIndex))
                                                             : registers.reg[regIndex];
 
@@ -442,4 +420,219 @@ uint8_t ReducedCPU::r_l_r_c_val8(uint8_t val) {
         registers.reg[F] |= ZeroFlag;
     }
     return val;
+}
+
+void ReducedCPU::incrementProgramCounterBy(uint16_t incrementAmount) {
+    registers.write16(PC, currentPC + incrementAmount);
+}
+
+// Load 16-bit immediate to 16-bit Reg
+uint8_t ReducedCPU::load_d16_to_reg(const ReducedInstruction &instruction) {
+    incrementProgramCounterBy(3);
+    registers.write16(instruction.getRegisterIndex(rowSelector), mmap.read16(static_cast<uint16_t>(currentPC + 1)));
+    return 12;
+}
+
+uint8_t ReducedCPU::load_reg8_to_regpt_vv_inc_dec(const ReducedInstruction &instruction) {
+    incrementProgramCounterBy(1);
+
+    // determine register containing destination pointer - BC, DE, HL+, HL-
+    const uint8_t reg16Index = instruction.getRegisterIndex(rowSelector);
+    uint16_t regAddress = registers.read16(reg16Index);
+
+    if (currentInstruction & 0x08) { // LD A, (xx)
+        registers.reg[A] = mmap.read(regAddress);
+    } else { // LD (xx), A
+        mmap.write(regAddress, registers.reg[A]);
+    }
+
+    // With Increment/Dec
+    if (rowSelector & 0x02) {
+        registers.write16(reg16Index, rowSelector == 2 ? ++regAddress : --regAddress);
+    }
+
+    return 8;
+}
+
+uint8_t ReducedCPU::inc_dec_reg16(const ReducedInstruction &instruction) {
+    incrementProgramCounterBy(1);
+    const uint8_t regIndex = instruction.getRegisterIndex(rowSelector);
+    uint16_t regValue = registers.read16(regIndex);
+    registers.write16(regIndex, currentInstruction & 0x08 ? --regValue : ++regValue);
+    return 8;
+}
+
+uint8_t ReducedCPU::inc_dec_reg8_or_regpt(const ReducedInstruction &instruction) {
+    incrementProgramCounterBy(1);
+    const uint8_t regIndex = regMap[splitRowSelector];
+    const bool isSubtract = (currentInstruction & 0x01) != 0;
+
+    uint8_t valueAfter, ticks;
+    if (splitRowSelector == 0x06) { // 0x34 or 0x35
+        const uint16_t memLocation = registers.read16(regIndex);
+        valueAfter = mmap.read(memLocation);
+        if (isSubtract) {
+            --valueAfter;
+        } else {
+            ++valueAfter;
+        }
+        mmap.write16(memLocation, valueAfter);
+        ticks = 12;
+    } else {
+        valueAfter = isSubtract ? --registers.reg[regIndex] : ++registers.reg[regIndex];
+        ticks = 4;
+    }
+
+    // Process flags - Affects Zero flag, Subtract flag and Half Carry flag
+    registers.reg[F] &= ~(ZeroFlag | SubtractFlag | HalfCarryFlag);
+    if (valueAfter == 0) {
+        registers.reg[F] |= ZeroFlag;
+    }
+    const uint8_t lowValueNibble = valueAfter & static_cast<uint8_t>(0x0F);
+    if (isSubtract) {
+        registers.reg[F] |= SubtractFlag;
+        if (lowValueNibble == 0x0F) {
+            registers.reg[F] |= HalfCarryFlag;
+        }
+    } else if (lowValueNibble == 0) {
+        registers.reg[F] |= HalfCarryFlag;
+    }
+
+    return ticks;
+}
+
+std::uint8_t ReducedCPU::load_d8_to_reg8_or_regpt(const ReducedInstruction &instruction) {
+    incrementProgramCounterBy(2);
+    const uint8_t regIndex = regMap[splitRowSelector];
+    const uint8_t immediateValue = getImmediateValue();
+    // LD X, d8 - 8-bit immediate
+    if (splitRowSelector == 0x06) {
+        mmap.write(registers.read16(regIndex), immediateValue);
+        return 12;
+    } else {
+        registers.reg[regIndex] = immediateValue;
+        return 8;
+    }
+}
+
+// JR X,r8
+uint8_t ReducedCPU::rel_cond_jmp() {
+    incrementProgramCounterBy(2);
+    bool shouldJump = true;
+
+    // Check if conditional jump
+    if (rowSelector & 0x02) {
+        const bool notZeroOrNotCarry = (currentInstruction & 0x08) == 0;
+        const uint8_t flag = rowSelector == 2 ? ZeroFlag : CarryFlag;
+        shouldJump = notZeroOrNotCarry != ((registers.reg[F] & flag) != 0);
+    }
+
+    if (shouldJump) {
+        registers.write16(PC, registers.read16(PC) + static_cast<int8_t>(getImmediateValue()));
+        return 12;
+    } else {
+        return 8;
+    }
+}
+
+std::uint8_t ReducedCPU::getImmediateValue() const {
+    return mmap.read(static_cast<uint16_t>(currentPC + 1));
+}
+
+std::uint8_t ReducedCPU::brancher_nop_stop_jmp_ld(const ReducedInstruction &instruction) {
+    if (rowSelector & 0x02) {
+        return rel_cond_jmp(); // JR conditional
+    } else {
+        const bool firstRow = rowSelector == 0;
+        if ((currentInstruction & 0x08) == 0) { // NOP, STOP
+            if (firstRow) {
+                incrementProgramCounterBy(1);
+            } else {
+                incrementProgramCounterBy(2);
+                throw runtime_error ("STOP instruction not yet implemented");
+            }
+            return 4;
+        } else { // LD, Jmp
+            if (firstRow) { // LD
+                return load_reg16_to_d16pt();
+            } else {
+                return rel_cond_jmp(); // JR Unconditional
+            }
+        }
+    }
+}
+
+// LD (a16),SP
+std::uint8_t ReducedCPU::load_reg16_to_d16pt() {
+    incrementProgramCounterBy(3);
+    mmap.write16(mmap.read16(static_cast<uint16_t>(currentPC + 1)), registers.read16(SP));
+    return 20;
+}
+
+std::uint8_t ReducedCPU::add_reg16_to_reg16_HL(const ReducedInstruction &instruction) {
+    incrementProgramCounterBy(1);
+    const uint16_t srcReg  = registers.read16(instruction.getRegisterIndex(rowSelector));
+    const uint16_t destReg = registers.read16(HL);
+    registers.write16(HL, srcReg + destReg);
+
+    // Affected flags - Half Carry flag and Carry flag
+    registers.reg[F] &= ~(SubtractFlag | HalfCarryFlag | CarryFlag);
+    // set if carry from bit 11 0x0FFF
+    if (0x1000 & ((destReg & 0x0FFF) + (srcReg & 0x0FFF))) {
+        registers.reg[F] |= HalfCarryFlag;
+    }
+    // set if carry from bit 15
+    if (0x10000 & (static_cast<uint32_t>(destReg) + srcReg)) {
+        registers.reg[F] |= CarryFlag;
+    }
+    return 8;
+}
+
+std::uint8_t ReducedCPU::brancher_r_l_r_c_cpl_c_daa_scf(const ReducedInstruction &instruction) {
+    incrementProgramCounterBy(1);
+    if (rowSelector & 0x02) {
+        if ((currentInstruction & 0x08) == 0) { // DAA, SCF
+            if (rowSelector == 2) { // DAA
+                // Reset all affected flags and set as necessary ones
+                registers.reg[F] &= ~(ZeroFlag | HalfCarryFlag | CarryFlag);
+
+                uint8_t regValue = registers.reg[A];
+                uint8_t low = static_cast<uint8_t>(regValue & 0x0F);
+                if ((registers.reg[F] & HalfCarryFlag) || low > 9) {
+                    if (registers.reg[F] & SubtractFlag) {
+                        regValue -= 0x06;
+                    } else {
+                        regValue += 0x06;
+                    }
+                }
+                uint8_t high = static_cast<uint8_t>((regValue >> 4) & 0x0F);
+                if ((registers.reg[F] & CarryFlag) || high > 9) {
+                    if (registers.reg[F] & SubtractFlag) {
+                        regValue -= 0x60;
+                    } else {
+                        regValue += 0x60;
+                    }
+                    registers.reg[F] |= CarryFlag; // Set carry flag
+                }
+
+                if (regValue == 0) {
+                    registers.reg[F] |=  ZeroFlag;
+                }
+            } else { // SCF
+                registers.reg[F] &= ~(SubtractFlag | HalfCarryFlag);
+                registers.reg[F] |= CarryFlag;
+            }
+        } else { // CPL, CCF
+            if (rowSelector == 2) { // CPL
+                registers.reg[A] = ~registers.reg[A];
+                registers.reg[F] |= (SubtractFlag | HalfCarryFlag);
+            } else { // CCF
+                registers.reg[F] &= ~(SubtractFlag | HalfCarryFlag);
+                registers.reg[F] ^= CarryFlag;
+            }
+        }
+    } else {
+        registers.reg[A] = r_l_r_c_val8(registers.reg[A]);
+    }
+    return 4;
 }
