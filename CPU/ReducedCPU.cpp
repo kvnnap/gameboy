@@ -15,6 +15,7 @@ using namespace Gameboy::CPU;
 const uint8_t Gameboy::CPU::ReducedCPU::regMap[8] = {B, C, D, E, H, L, HL, A};
 const uint8_t Gameboy::CPU::ReducedCPU::reg16Map[4] = {BC, DE, HL, SP};
 const uint8_t Gameboy::CPU::ReducedCPU::reg16MapLdInc[4] = {BC, DE, HL, HL};
+const uint8_t Gameboy::CPU::ReducedCPU::reg16MapPopPush[4] = {BC, DE, HL, AF};
 
 const ReducedInstruction Gameboy::CPU::ReducedCPU::instructions[16] = {
         {&ReducedCPU::brancher_nop_stop_jmp_ld, nullptr},               // 0xX0
@@ -33,6 +34,25 @@ const ReducedInstruction Gameboy::CPU::ReducedCPU::instructions[16] = {
         {&ReducedCPU::inc_dec_reg8_or_regpt, nullptr},                  // 0xXD
         {&ReducedCPU::load_d8_to_reg8_or_regpt, nullptr},               // 0xXE
         {&ReducedCPU::brancher_r_l_r_c_cpl_c_daa_scf, nullptr}          // 0xXF
+};
+
+const ReducedInstruction Gameboy::CPU::ReducedCPU::instructions2[16] = {
+        {nullptr, nullptr},                                 // 0xX0
+        {&ReducedCPU::push_pop, &reg16MapPopPush},          // 0xX1
+        {&ReducedCPU::brancher_jmp_load, nullptr},          // 0xX2
+        {nullptr, nullptr},                                 // 0xX3
+        {nullptr, nullptr},                                 // 0xX4
+        {&ReducedCPU::push_pop, &reg16MapPopPush},          // 0xX5
+        {nullptr, nullptr},                                 // 0xX6
+        {&ReducedCPU::rst, nullptr},                        // 0xX7
+        {nullptr, nullptr},                                 // 0xX8
+        {nullptr, nullptr},                                 // 0xX9
+        {&ReducedCPU::brancher_jmp_load, nullptr},          // 0xXA
+        {nullptr, nullptr},                                 // 0xXB
+        {nullptr, nullptr},                                 // 0xXC
+        {nullptr, nullptr},                                 // 0xXD
+        {nullptr, nullptr},                                 // 0xXE
+        {&ReducedCPU::rst, nullptr}                         // 0xXF
 };
 
 ReducedCPU::ReducedCPU(Memory::MemoryMappedIO &p_mmap)
@@ -163,6 +183,13 @@ void ReducedCPU::next() {
 
                 // ticks for loads
                 ticks += isMemoryOperation ? 8 : 4;
+            }
+                break;
+            case 3:
+            {
+                rowSelector = splitRowSelector >> 1;
+                const ReducedInstruction * instruction = &instructions2[currentInstruction & 0x0F];
+                ticks += (this->*instruction->execfn)(*instruction);
             }
                 break;
             default:
@@ -535,6 +562,25 @@ uint8_t ReducedCPU::rel_cond_jmp() {
     }
 }
 
+std::uint8_t ReducedCPU::cond_jmp() {
+    incrementProgramCounterBy(3);
+    bool shouldJump = true;
+
+    // Check if conditional jump
+    if ((currentInstruction & 0x01) == 0) {
+        const bool notZeroOrNotCarry = (currentInstruction & 0x08) == 0;
+        const uint8_t flag = rowSelector == 0 ? ZeroFlag : CarryFlag;
+        shouldJump = notZeroOrNotCarry != ((registers.reg[F] & flag) != 0);
+    }
+
+    if (shouldJump) {
+        registers.write16(PC, mmap.read16(static_cast<uint16_t>(currentPC + 1)));
+        return 16;
+    } else {
+        return 12;
+    }
+}
+
 std::uint8_t ReducedCPU::getImmediateValue() const {
     return mmap.read(static_cast<uint16_t>(currentPC + 1));
 }
@@ -636,3 +682,61 @@ std::uint8_t ReducedCPU::brancher_r_l_r_c_cpl_c_daa_scf(const ReducedInstruction
     }
     return 4;
 }
+
+std::uint8_t ReducedCPU::push_pop(const ReducedInstruction &instruction) {
+    incrementProgramCounterBy(1);
+    // Read stack pointer - src has SP
+    uint16_t stackPointer = registers.read16(SP);
+    const uint8_t registerIndex = instruction.getRegisterIndex(rowSelector);
+
+    if (currentInstruction & 0x04) { // Push
+        // Copy to stack
+        mmap.write16(stackPointer -= 2, registers.read16(registerIndex));
+    } else { // Pop
+        // Copy to register - read two bytes from stack and assign them to destination register
+        registers.write16(registerIndex, mmap.read16(stackPointer));
+        // Increment stack pointer
+        stackPointer += 2;
+    }
+
+    registers.write16(SP, stackPointer);
+    return 12;
+}
+
+std::uint8_t ReducedCPU::rst(const ReducedInstruction &instruction) {
+    incrementProgramCounterBy(1);
+    // Copy to stack
+    uint16_t stackPointer = registers.read16(SP);
+    mmap.write16(stackPointer -= 2, registers.read16(PC));
+    registers.write16(SP, stackPointer);
+    // dynamically calculate from opcode
+    registers.write16(PC, static_cast<uint16_t>(currentInstruction & 0x38));
+    return 16;
+}
+
+// could separate these in two, but want to keep compact for debugging
+std::uint8_t ReducedCPU::load_reg8_to_reg8pt_vv() {
+    if ((currentInstruction & 0x08) == 0) { // LD A,(C) has alternative mnemonic LD A,($FF00+C), LD C,(A) has alternative mnemonic LD ($FF00+C),A
+        incrementProgramCounterBy(2);
+        if (rowSelector == 2) {
+            mmap.write(static_cast<uint16_t>(0xFF00 | mmap.read(registers.reg[C])), registers.reg[A]);
+        } else {
+            registers.reg[A] = mmap.read(static_cast<uint16_t>(0xFF00 | registers.reg[C]));
+        }
+        return 8;
+    } else {
+        incrementProgramCounterBy(3);
+        const uint16_t address = mmap.read16(static_cast<uint16_t>(currentPC + 1));
+        if (rowSelector == 2) {
+            mmap.write(address, registers.reg[A]);
+        } else {
+            registers.reg[A] = mmap.read(address);
+        }
+        return 16;
+    }
+}
+
+std::uint8_t ReducedCPU::brancher_jmp_load(const ReducedInstruction &instruction) {
+    return rowSelector & 0x02 ? load_reg8_to_reg8pt_vv() : cond_jmp();
+}
+

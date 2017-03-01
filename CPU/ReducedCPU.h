@@ -28,9 +28,11 @@ namespace Gameboy {
 
         private:
             static const ReducedInstruction instructions[16];
+            static const ReducedInstruction instructions2[16];
             static const uint8_t regMap[8];
             static const uint8_t reg16Map[4];
             static const uint8_t reg16MapLdInc[4];
+            static const uint8_t reg16MapPopPush[4];
 
             Registers registers;
             Memory::MemoryMappedIO& mmap;
@@ -51,18 +53,25 @@ namespace Gameboy {
             // Branchers
             std::uint8_t brancher_nop_stop_jmp_ld(const ReducedInstruction& instruction);
             std::uint8_t brancher_r_l_r_c_cpl_c_daa_scf(const ReducedInstruction& instruction);
+            std::uint8_t brancher_jmp_load(const ReducedInstruction& instruction);
 
-            // Less-compact implementations
+            // Less-compact implementations (Part 1)
             std::uint8_t load_d16_to_reg(const ReducedInstruction& instruction);
             std::uint8_t load_reg8_to_regpt_vv_inc_dec(const ReducedInstruction &instruction);
             std::uint8_t inc_dec_reg16(const ReducedInstruction& instruction);
             std::uint8_t inc_dec_reg8_or_regpt(const ReducedInstruction &instruction);
             std::uint8_t load_d8_to_reg8_or_regpt(const ReducedInstruction& instruction);
-            std::uint8_t load_reg16_to_d16pt();
             std::uint8_t add_reg16_to_reg16_HL(const ReducedInstruction &instruction); // TO HL
 
-            // Implementations
+            // Implementations used by branchers
             std::uint8_t rel_cond_jmp();
+            std::uint8_t load_reg16_to_d16pt();
+            std::uint8_t cond_jmp();
+            std::uint8_t load_reg8_to_reg8pt_vv(); // These add to
+
+            // Less-compact implementations (Part 2)
+            std::uint8_t push_pop(const ReducedInstruction &instruction);
+            std::uint8_t rst(const ReducedInstruction &instruction);
 
             void add_val8_to_reg8_nc_c(std::uint8_t srcValue, bool carry);
             void sub_val8_from_reg8_nc_c(std::uint8_t srcValue, bool carry);
