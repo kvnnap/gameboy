@@ -37,7 +37,7 @@ const ReducedInstruction Gameboy::CPU::ReducedCPU::instructions[16] = {
 };
 
 const ReducedInstruction Gameboy::CPU::ReducedCPU::instructions2[16] = {
-        {nullptr, nullptr},                                 // 0xX0
+        {&ReducedCPU::brancher_ret_ld_ldh_add, nullptr},    // 0xX0
         {&ReducedCPU::push_pop, &reg16MapPopPush},          // 0xX1
         {&ReducedCPU::brancher_jmp_load, nullptr},          // 0xX2
         {nullptr, nullptr},                                 // 0xX3
@@ -45,7 +45,7 @@ const ReducedInstruction Gameboy::CPU::ReducedCPU::instructions2[16] = {
         {&ReducedCPU::push_pop, &reg16MapPopPush},          // 0xX5
         {nullptr, nullptr},                                 // 0xX6
         {&ReducedCPU::rst, nullptr},                        // 0xX7
-        {nullptr, nullptr},                                 // 0xX8
+        {&ReducedCPU::brancher_ret_ld_ldh_add, nullptr},    // 0xX8
         {nullptr, nullptr},                                 // 0xX9
         {&ReducedCPU::brancher_jmp_load, nullptr},          // 0xXA
         {nullptr, nullptr},                                 // 0xXB
@@ -147,11 +147,12 @@ void ReducedCPU::next() {
                 registers.write16(PC, static_cast<uint16_t>(currentPC + 1));
 
                 // ADD, ADC, SUB, SBC, AND, XOR, OR, CP
-                const uint8_t rowSelector = splitRowSelector >> 1;
+                rowSelector = splitRowSelector >> 1;
                 const bool carryOrDualOperation = (splitRowSelector & 0x01) == 0x01;
                 const uint8_t readValue = isMemoryOperation ? mmap.read(registers.read16(regIndex))
                                                             : registers.reg[regIndex];
 
+                // In this block, rowSelector only used in switch
                 switch (rowSelector) {
                     case 0: // ADD/ADC
                         add_val8_to_reg8_nc_c(readValue, carryOrDualOperation);
@@ -549,9 +550,7 @@ uint8_t ReducedCPU::rel_cond_jmp() {
 
     // Check if conditional jump
     if (rowSelector & 0x02) {
-        const bool notZeroOrNotCarry = (currentInstruction & 0x08) == 0;
-        const uint8_t flag = rowSelector == 2 ? ZeroFlag : CarryFlag;
-        shouldJump = notZeroOrNotCarry != ((registers.reg[F] & flag) != 0);
+        shouldJump = getShouldJump(rowSelector == 2 ? ZeroFlag : CarryFlag);
     }
 
     if (shouldJump) {
@@ -568,9 +567,7 @@ std::uint8_t ReducedCPU::cond_jmp() {
 
     // Check if conditional jump
     if ((currentInstruction & 0x01) == 0) {
-        const bool notZeroOrNotCarry = (currentInstruction & 0x08) == 0;
-        const uint8_t flag = rowSelector == 0 ? ZeroFlag : CarryFlag;
-        shouldJump = notZeroOrNotCarry != ((registers.reg[F] & flag) != 0);
+        shouldJump = getShouldJump(rowSelector == 0 ? ZeroFlag : CarryFlag);
     }
 
     if (shouldJump) {
@@ -738,5 +735,76 @@ std::uint8_t ReducedCPU::load_reg8_to_reg8pt_vv() {
 
 std::uint8_t ReducedCPU::brancher_jmp_load(const ReducedInstruction &instruction) {
     return rowSelector & 0x02 ? load_reg8_to_reg8pt_vv() : cond_jmp();
+}
+
+std::uint8_t ReducedCPU::brancher_ret_ld_ldh_add(const ReducedInstruction &instruction) {
+    return rowSelector & 0x02 ? load_reg8_to_d8_pt_vv() : cond_ret();
+}
+
+std::uint8_t ReducedCPU::cond_ret() {
+    // jump
+    incrementProgramCounterBy(1);
+    bool shouldJump = true;
+
+    // Check if conditional jump
+    if ((currentInstruction & 0x01) == 0) {
+        shouldJump = getShouldJump(rowSelector == 0 ? ZeroFlag : CarryFlag);
+    }
+
+    if (shouldJump) {
+        // Basically pop
+        // Read stack pointer - src has SP
+        uint16_t stackPointer = registers.read16(SP);
+        // Copy to register - read two bytes from stack and assign them to destination register
+        registers.write16(PC, mmap.read16(stackPointer));
+        // Increment stack pointer
+        stackPointer += 2;
+        registers.write16(SP, stackPointer);
+
+        return 20;
+    } else {
+        return 8;
+    }
+}
+
+bool ReducedCPU::getShouldJump(FlagRegister flag) const {
+    const bool notZeroOrNotCarry = (currentInstruction & 0x08) == 0;
+    return notZeroOrNotCarry != ((registers.reg[F] & flag) != 0);
+}
+
+std::uint8_t ReducedCPU::load_reg8_to_d8_pt_vv() {
+    incrementProgramCounterBy(2);
+    uint8_t count = 12;
+    if (splitRowSelector & 0x01) { // LD HL, SP+r8
+        uint16_t temp = registers.read16(SP);
+        int8_t srcValToAdd = static_cast<int8_t>(mmap.read(static_cast<uint16_t>(currentPC + 1)));
+        if (rowSelector & 0x01) {
+            registers.write16(HL, temp + srcValToAdd);
+        } else {
+            // AKA ADD SP, r8
+            registers.write16(SP, temp + srcValToAdd);
+            count = 16;
+        }
+
+        // Affected flags - Half Carry flag and Carry flag
+        registers.reg[F] &= ~(ZeroFlag | SubtractFlag | HalfCarryFlag | CarryFlag);
+        // set if carry from bit 11 0x0FFF
+        if (0x1000 & ((temp & 0x0FFF) + srcValToAdd)) {
+            registers.reg[F] |= HalfCarryFlag;
+        }
+        // set if carry from bit 15
+        if (0x10000 & (static_cast<uint32_t>(temp) + srcValToAdd)) {
+            registers.reg[F] |= CarryFlag;
+        }
+    } else {
+        if (rowSelector & 0x01) {
+            registers.reg[A] =
+                    mmap.read(static_cast<uint16_t>(0xFF00 | mmap.read(static_cast<uint16_t>(currentPC + 1))));
+        } else {
+            mmap.write(static_cast<uint16_t>(0xFF00 | mmap.read(static_cast<uint16_t>(currentPC + 1))),
+                       registers.reg[A]);
+        }
+    }
+    return count;
 }
 

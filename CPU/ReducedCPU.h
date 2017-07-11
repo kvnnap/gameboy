@@ -49,11 +49,13 @@ namespace Gameboy {
             // Useful methods
             void incrementProgramCounterBy(std::uint16_t incrementAmount);
             std::uint8_t getImmediateValue() const;
+            bool getShouldJump(FlagRegister flag) const;
 
             // Branchers
             std::uint8_t brancher_nop_stop_jmp_ld(const ReducedInstruction& instruction);
             std::uint8_t brancher_r_l_r_c_cpl_c_daa_scf(const ReducedInstruction& instruction);
             std::uint8_t brancher_jmp_load(const ReducedInstruction& instruction);
+            std::uint8_t brancher_ret_ld_ldh_add(const ReducedInstruction& instruction);
 
             // Less-compact implementations (Part 1)
             std::uint8_t load_d16_to_reg(const ReducedInstruction& instruction);
@@ -62,12 +64,14 @@ namespace Gameboy {
             std::uint8_t inc_dec_reg8_or_regpt(const ReducedInstruction &instruction);
             std::uint8_t load_d8_to_reg8_or_regpt(const ReducedInstruction& instruction);
             std::uint8_t add_reg16_to_reg16_HL(const ReducedInstruction &instruction); // TO HL
+            std::uint8_t load_reg8_to_d8_pt_vv();
 
             // Implementations used by branchers
             std::uint8_t rel_cond_jmp();
             std::uint8_t load_reg16_to_d16pt();
             std::uint8_t cond_jmp();
             std::uint8_t load_reg8_to_reg8pt_vv(); // These add to
+            std::uint8_t cond_ret();
 
             // Less-compact implementations (Part 2)
             std::uint8_t push_pop(const ReducedInstruction &instruction);
