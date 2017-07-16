@@ -37,22 +37,22 @@ const ReducedInstruction Gameboy::CPU::ReducedCPU::instructions[16] = {
 };
 
 const ReducedInstruction Gameboy::CPU::ReducedCPU::instructions2[16] = {
-        {&ReducedCPU::brancher_ret_ld_ldh_add, nullptr},    // 0xX0
-        {&ReducedCPU::push_pop, &reg16MapPopPush},          // 0xX1
-        {&ReducedCPU::brancher_jmp_load, nullptr},          // 0xX2
-        {nullptr, nullptr},                                 // 0xX3
-        {nullptr, nullptr},                                 // 0xX4
-        {&ReducedCPU::push_pop, &reg16MapPopPush},          // 0xX5
-        {nullptr, nullptr},                                 // 0xX6
-        {&ReducedCPU::rst, nullptr},                        // 0xX7
-        {&ReducedCPU::brancher_ret_ld_ldh_add, nullptr},    // 0xX8
-        {nullptr, nullptr},                                 // 0xX9
-        {&ReducedCPU::brancher_jmp_load, nullptr},          // 0xXA
-        {nullptr, nullptr},                                 // 0xXB
-        {nullptr, nullptr},                                 // 0xXC
-        {nullptr, nullptr},                                 // 0xXD
-        {nullptr, nullptr},                                 // 0xXE
-        {&ReducedCPU::rst, nullptr}                         // 0xXF
+        {&ReducedCPU::brancher_ret_ld_ldh_add, nullptr},            // 0xX0
+        {&ReducedCPU::push_pop, &reg16MapPopPush},                  // 0xX1
+        {&ReducedCPU::brancher_jmp_load, nullptr},                  // 0xX2
+        {&ReducedCPU::brancher_jmp_ei_di, nullptr},                 // 0xX3
+        {&ReducedCPU::rel_cond_call, nullptr},                      // 0xX4
+        {&ReducedCPU::push_pop, &reg16MapPopPush},                  // 0xX5
+        {&ReducedCPU::dispatch_add_sub_and_xor_or_cp_nc_c, nullptr},// 0xX6
+        {&ReducedCPU::rst, nullptr},                                // 0xX7
+        {&ReducedCPU::brancher_ret_ld_ldh_add, nullptr},            // 0xX8
+        {&ReducedCPU::brancher_ret_jmp_ld, nullptr},                // 0xX9
+        {&ReducedCPU::brancher_jmp_load, nullptr},                  // 0xXA
+        {&ReducedCPU::brancher_jmp_ei_di, nullptr},                 // 0xXB
+        {&ReducedCPU::rel_cond_call, nullptr},                      // 0xXC
+        {&ReducedCPU::call, nullptr},                               // 0xXD
+        {&ReducedCPU::dispatch_add_sub_and_xor_or_cp_nc_c, nullptr},// 0xXE
+        {&ReducedCPU::rst, nullptr}                                 // 0xXF
 };
 
 ReducedCPU::ReducedCPU(Memory::MemoryMappedIO &p_mmap)
@@ -86,10 +86,10 @@ void ReducedCPU::next() {
     // Decode Extended
     if (currentInstruction == 0xCB) {
         isCurrentExtended = true;
-        registers.write16(PC, static_cast<uint16_t>(currentPC + 1));
+        incrementProgramCounterBy(1);
         currentPC = registers.read16(PC);
         currentInstruction = mmap.read(currentPC);
-        registers.write16(PC, static_cast<uint16_t>(currentPC + 1));
+        incrementProgramCounterBy(1);
         // read next instruction
     }
 
@@ -103,11 +103,11 @@ void ReducedCPU::next() {
         // TODO: Implement
 
         splitRowSelector = static_cast<uint8_t>((currentInstruction >> 3) & 0x07);
+        rowSelector = splitRowSelector >> 1;
 
         switch (rangeNum) {
             case 0:
             {
-                rowSelector = splitRowSelector >> 1;
                 const ReducedInstruction * instruction = &instructions[currentInstruction & 0x0F];
                 ticks += (this->*instruction->execfn)(*instruction);
             }
@@ -115,12 +115,13 @@ void ReducedCPU::next() {
             // Loads
             case 1:
             {
+                // rowSelector not needed here
                 // Decode
                 const uint8_t destRegIndex = regMap[splitRowSelector];
                 const bool isDestMemoryOperation = splitRowSelector == 0x06;
 
                 // Increment Program Counter by 1 (Loads are byte long)
-                registers.write16(PC, static_cast<uint16_t>(currentPC + 1));
+                incrementProgramCounterBy(1);
 
                 // Further decode and execute Load
                 if (isDestMemoryOperation) {
@@ -144,43 +145,13 @@ void ReducedCPU::next() {
             case 2:
             {
                 // Increment Program Counter by 1
-                registers.write16(PC, static_cast<uint16_t>(currentPC + 1));
+                incrementProgramCounterBy(1);
 
                 // ADD, ADC, SUB, SBC, AND, XOR, OR, CP
-                rowSelector = splitRowSelector >> 1;
-                const bool carryOrDualOperation = (splitRowSelector & 0x01) == 0x01;
                 const uint8_t readValue = isMemoryOperation ? mmap.read(registers.read16(regIndex))
                                                             : registers.reg[regIndex];
 
-                // In this block, rowSelector only used in switch
-                switch (rowSelector) {
-                    case 0: // ADD/ADC
-                        add_val8_to_reg8_nc_c(readValue, carryOrDualOperation);
-                        break;
-                    case 1: // SUB/SBC
-                        sub_val8_from_reg8_nc_c(readValue, carryOrDualOperation);
-                        break;
-                    case 2: // AND/XOR
-                        if (carryOrDualOperation) {
-                            // XOR
-                            xor_val8_to_reg8(readValue);
-                        } else {
-                            // AND
-                            and_val8_to_reg8(readValue);
-                        }
-                        break;
-                    case 3: // OR/CP
-                        if (carryOrDualOperation) {
-                            // CP
-                            cp_val8_to_reg8(readValue);
-                        } else {
-                            // OR
-                            or_val8_to_reg8(readValue);
-                        }
-                        break;
-                    default:
-                        throw runtime_error("Code that should never be reached was reached");
-                }
+                add_sub_and_xor_or_cp_nc_c(readValue);
 
                 // ticks for loads
                 ticks += isMemoryOperation ? 8 : 4;
@@ -188,7 +159,6 @@ void ReducedCPU::next() {
                 break;
             case 3:
             {
-                rowSelector = splitRowSelector >> 1;
                 const ReducedInstruction * instruction = &instructions2[currentInstruction & 0x0F];
                 ticks += (this->*instruction->execfn)(*instruction);
             }
@@ -457,7 +427,7 @@ void ReducedCPU::incrementProgramCounterBy(uint16_t incrementAmount) {
 // Load 16-bit immediate to 16-bit Reg
 uint8_t ReducedCPU::load_d16_to_reg(const ReducedInstruction &instruction) {
     incrementProgramCounterBy(3);
-    registers.write16(instruction.getRegisterIndex(rowSelector), mmap.read16(static_cast<uint16_t>(currentPC + 1)));
+    registers.write16(instruction.getRegisterIndex(rowSelector), getImmediateValue16());
     return 12;
 }
 
@@ -571,8 +541,7 @@ std::uint8_t ReducedCPU::cond_jmp() {
     }
 
     if (shouldJump) {
-        registers.write16(PC, mmap.read16(static_cast<uint16_t>(currentPC + 1)));
-        return 16;
+        return jmp(false);
     } else {
         return 12;
     }
@@ -580,6 +549,10 @@ std::uint8_t ReducedCPU::cond_jmp() {
 
 std::uint8_t ReducedCPU::getImmediateValue() const {
     return mmap.read(static_cast<uint16_t>(currentPC + 1));
+}
+
+uint16_t ReducedCPU::getImmediateValue16() const {
+    return mmap.read16(static_cast<uint16_t>(currentPC + 1));
 }
 
 std::uint8_t ReducedCPU::brancher_nop_stop_jmp_ld(const ReducedInstruction &instruction) {
@@ -608,7 +581,7 @@ std::uint8_t ReducedCPU::brancher_nop_stop_jmp_ld(const ReducedInstruction &inst
 // LD (a16),SP
 std::uint8_t ReducedCPU::load_reg16_to_d16pt() {
     incrementProgramCounterBy(3);
-    mmap.write16(mmap.read16(static_cast<uint16_t>(currentPC + 1)), registers.read16(SP));
+    mmap.write16(getImmediateValue16(), registers.read16(SP));
     return 20;
 }
 
@@ -723,7 +696,7 @@ std::uint8_t ReducedCPU::load_reg8_to_reg8pt_vv() {
         return 8;
     } else {
         incrementProgramCounterBy(3);
-        const uint16_t address = mmap.read16(static_cast<uint16_t>(currentPC + 1));
+        const uint16_t address = getImmediateValue16();
         if (rowSelector == 2) {
             mmap.write(address, registers.reg[A]);
         } else {
@@ -753,13 +726,7 @@ std::uint8_t ReducedCPU::cond_ret() {
 
     if (shouldJump) {
         // Basically pop
-        // Read stack pointer - src has SP
-        uint16_t stackPointer = registers.read16(SP);
-        // Copy to register - read two bytes from stack and assign them to destination register
-        registers.write16(PC, mmap.read16(stackPointer));
-        // Increment stack pointer
-        stackPointer += 2;
-        registers.write16(SP, stackPointer);
+        ret(false);
 
         return 20;
     } else {
@@ -777,7 +744,7 @@ std::uint8_t ReducedCPU::load_reg8_to_d8_pt_vv() {
     uint8_t count = 12;
     if (splitRowSelector & 0x01) { // LD HL, SP+r8
         uint16_t temp = registers.read16(SP);
-        int8_t srcValToAdd = static_cast<int8_t>(mmap.read(static_cast<uint16_t>(currentPC + 1)));
+        int8_t srcValToAdd = static_cast<int8_t>(getImmediateValue());
         if (rowSelector & 0x01) {
             registers.write16(HL, temp + srcValToAdd);
         } else {
@@ -797,14 +764,138 @@ std::uint8_t ReducedCPU::load_reg8_to_d8_pt_vv() {
             registers.reg[F] |= CarryFlag;
         }
     } else {
+        const uint16_t tempAddress = static_cast<uint16_t>(0xFF00 | getImmediateValue());
         if (rowSelector & 0x01) {
-            registers.reg[A] =
-                    mmap.read(static_cast<uint16_t>(0xFF00 | mmap.read(static_cast<uint16_t>(currentPC + 1))));
+            registers.reg[A] = mmap.read(tempAddress);
         } else {
-            mmap.write(static_cast<uint16_t>(0xFF00 | mmap.read(static_cast<uint16_t>(currentPC + 1))),
-                       registers.reg[A]);
+            mmap.write(tempAddress, registers.reg[A]);
         }
     }
     return count;
+}
+
+std::uint8_t ReducedCPU::jmp(bool incrementPC) {
+    if (incrementPC) {
+        incrementProgramCounterBy(3);
+    }
+    registers.write16(PC, getImmediateValue16());
+    return 16;
+}
+
+uint8_t ReducedCPU::jmp_from_HL_pt() {
+    incrementProgramCounterBy(1);
+    registers.write16(PC, mmap.read16(registers.read16(HL)));
+    return 4;
+}
+
+std::uint8_t ReducedCPU::load_HL_to_SP () {
+    incrementProgramCounterBy(1);
+    registers.write16(SP, registers.read16(HL));
+    return 8;
+}
+
+std::uint8_t ReducedCPU::brancher_ret_jmp_ld(const ReducedInstruction &instruction) {
+    if (rowSelector < 2)
+    {
+        return ret(true, rowSelector == 1);
+    } else {
+        return rowSelector == 2 ? jmp_from_HL_pt() : load_HL_to_SP();
+    }
+}
+
+std::uint8_t ReducedCPU::brancher_jmp_ei_di(const ReducedInstruction &instruction) {
+    if (rowSelector == 0)
+    {
+        return jmp();
+    } else {
+        incrementProgramCounterBy(1);
+        interruptMasterEnable = (splitRowSelector & 1) != 0;
+        return 4;
+    }
+}
+
+std::uint8_t ReducedCPU::call(const ReducedInstruction &instruction) {
+    return b_call();
+}
+
+std::uint8_t ReducedCPU::rel_cond_call(const ReducedInstruction &instruction) {
+    incrementProgramCounterBy(3);
+    bool shouldJump = getShouldJump(rowSelector == 0 ? ZeroFlag : CarryFlag);
+    if (shouldJump) {
+        return b_call(false);
+    }
+    return 12;
+}
+
+std::uint8_t ReducedCPU::b_call(bool incrementPC) {
+    if (incrementPC) {
+        incrementProgramCounterBy(3);
+    }
+    // push
+    uint16_t stackPointer = registers.read16(SP);
+    mmap.write16(stackPointer -= 2, registers.read16(PC));
+    // decrement SP
+    registers.write16(SP, stackPointer);
+    // jump to address
+    registers.write16(PC, getImmediateValue16());
+    return 24;
+}
+
+void ReducedCPU::add_sub_and_xor_or_cp_nc_c(std::uint8_t readValue) {
+    const bool carryOrDualOperation = (splitRowSelector & 0x01) == 0x01;
+
+    // In this block, rowSelector only used in switch
+    switch (rowSelector) {
+        case 0: // ADD/ADC
+            add_val8_to_reg8_nc_c(readValue, carryOrDualOperation);
+            break;
+        case 1: // SUB/SBC
+            sub_val8_from_reg8_nc_c(readValue, carryOrDualOperation);
+            break;
+        case 2: // AND/XOR
+            if (carryOrDualOperation) {
+                // XOR
+                xor_val8_to_reg8(readValue);
+            } else {
+                // AND
+                and_val8_to_reg8(readValue);
+            }
+            break;
+        case 3: // OR/CP
+            if (carryOrDualOperation) {
+                // CP
+                cp_val8_to_reg8(readValue);
+            } else {
+                // OR
+                or_val8_to_reg8(readValue);
+            }
+            break;
+        default:
+            throw runtime_error("Code that should never be reached was reached");
+    }
+}
+
+std::uint8_t ReducedCPU::dispatch_add_sub_and_xor_or_cp_nc_c(const ReducedInstruction &instruction) {
+    incrementProgramCounterBy(2);
+    add_sub_and_xor_or_cp_nc_c(getImmediateValue());
+    return 8;
+}
+
+std::uint8_t ReducedCPU::ret(bool incrementPC, bool enableInterrupts) {
+    if (incrementPC) {
+        incrementProgramCounterBy(1);
+    }
+    // Read stack pointer - src has SP
+    uint16_t stackPointer = registers.read16(SP);
+    // Copy to register - read two bytes from stack and assign them to destination register
+    registers.write16(PC, mmap.read16(stackPointer));
+    // Increment stack pointer
+    stackPointer += 2;
+    registers.write16(SP, stackPointer);
+
+    if (enableInterrupts) {
+        interruptMasterEnable = true;
+    }
+    return 16;
 }
 
