@@ -29,7 +29,7 @@ int main(int argc, char * argv[]) {
 
         // Setup Devices
         MemoryMappedIO mmap (cartridge.getMBC());
-        ReducedCPU cpu (mmap);
+        CPU cpu (mmap);
         Joypad joypad (cpu);
         SDLVideoDevice sdlVideoDevice;
         GPU gpu (cpu, sdlVideoDevice);

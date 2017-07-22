@@ -27,7 +27,7 @@ namespace Gameboy {
             void requestInterrupt(std::uint8_t irqLine) override;
 
         private:
-            static const Instruction instructions[256];
+            static const Instruction instructions[128];
             static const uint8_t regMap[8];
 
             Registers registers;
@@ -38,6 +38,26 @@ namespace Gameboy {
             bool interruptMasterEnable;
 
             uint32_t ticks;
+
+            uint8_t splitRowSelector; // 3-bit row divided by two selector
+
+            // Utils
+            void incrementProgramCounterBy(std::uint16_t incrementAmount);
+            std::uint8_t getImmediateValue() const;
+            std::uint16_t getImmediateValue16() const;
+            bool getShouldJump(bool, std::uint8_t) const;
+
+            // Brancher
+            void add_sub_and_xor_or_cp_nc_c (std::uint8_t srcValue);
+            std::uint8_t brancher_add_sub_and_xor_or_cp_nc_c (const Instruction& instruction);
+
+            // Add stuff
+            void add_val8_to_reg8_nc_c(std::uint8_t srcValue, bool carry);
+            void sub_val8_from_reg8_nc_c(std::uint8_t srcValue, bool carry);
+            void and_val8_to_reg8(std::uint8_t srcValue);
+            void xor_val8_to_reg8(std::uint8_t srcValue);
+            void or_val8_to_reg8(std::uint8_t srcValue);
+            void cp_val8_to_reg8(std::uint8_t srcValue);
 
             // Instruction implementations
             std::uint8_t load_d16_to_reg(const Instruction &instruction);
@@ -55,6 +75,8 @@ namespace Gameboy {
             std::uint8_t load_reg16_to_d16pt(const Instruction &instruction);
 
             std::uint8_t add_reg16_to_reg16(const Instruction &instruction);
+
+            std::uint8_t add_r8_to_reg16(const Instruction &instruction);
 
             std::uint8_t load_regpt_to_reg8(const Instruction &instruction);
 
@@ -98,53 +120,7 @@ namespace Gameboy {
 
             uint8_t cpl_carryflag(const Instruction &instruction);
 
-            uint8_t load_reg8_to_reg8(const Instruction &instruction);
-
             uint8_t halt(const Instruction &instruction);
-
-            void add_val8_to_reg8_nc_c(std::uint8_t destRegIndex, std::uint8_t srcValue, bool carry);
-
-            uint8_t add_reg8_to_reg8(const Instruction &instruction);
-
-            uint8_t add_reg8_to_reg8_c(const Instruction &instruction);
-
-            uint8_t add_regpt_to_reg8(const Instruction &instruction);
-
-            uint8_t add_regpt_to_reg8_c(const Instruction &instruction);
-
-            void sub_val8_from_reg8_nc_c(std::uint8_t destRegIndex, std::uint8_t srcValue, bool carry);
-
-            uint8_t sub_reg8_from_reg8(const Instruction &instruction);
-
-            uint8_t sub_reg8_from_reg8_c(const Instruction &instruction);
-
-            uint8_t sub_regpt_from_reg8(const Instruction &instruction);
-
-            uint8_t sub_regpt_from_reg8_c(const Instruction &instruction);
-
-            uint8_t and_reg8_to_reg8(const Instruction &instruction);
-
-            uint8_t and_regpt_to_reg8(const Instruction &instruction);
-
-            void and_val8_to_reg8(uint8_t destRegIndex, uint8_t srcValue);
-
-            void xor_val8_to_reg8(uint8_t destRegIndex, uint8_t srcValue);
-
-            uint8_t xor_reg8_to_reg8(const Instruction &instruction);
-
-            uint8_t xor_regpt_to_reg8(const Instruction &instruction);
-
-            void or_val8_to_reg8(uint8_t destRegIndex, uint8_t srcValue);
-
-            uint8_t or_reg8_to_reg8(const Instruction &instruction);
-
-            uint8_t or_regpt_to_reg8(const Instruction &instruction);
-
-            void cp_val8_to_reg8(uint8_t destRegIndex, uint8_t srcValue);
-
-            uint8_t cp_reg8_to_reg8(const Instruction &instruction);
-
-            uint8_t cp_regpt_to_reg8(const Instruction &instruction);
 
             uint8_t ret(const Instruction &instruction);
 
@@ -188,30 +164,11 @@ namespace Gameboy {
 
             uint8_t call_c(const Instruction &instruction);
 
-            uint8_t add_d8_to_reg8(const Instruction &instruction);
-
-            uint8_t add_d8_to_reg8_c(const Instruction &instruction);
-
-            uint8_t sub_d8_to_reg8(const Instruction &instruction);
-
-            uint8_t sub_d8_to_reg8_c(const Instruction &instruction);
-
             uint8_t rst(const Instruction &instruction);
-
 
             uint8_t load_reg8_to_d8pt(const Instruction &instruction);
 
             uint8_t load_reg8_to_reg8pt(const Instruction &instruction);
-
-            uint8_t and_d8_to_reg8(const Instruction &instruction);
-
-            uint8_t xor_d8_to_reg8(const Instruction &instruction);
-
-            uint8_t or_d8_to_reg8(const Instruction &instruction);
-
-            uint8_t cp_d8_to_reg8(const Instruction &instruction);
-
-            uint8_t add_r8_to_reg16(const Instruction &instruction);
 
             uint8_t jmp_regpt(const Instruction &instruction);
 
