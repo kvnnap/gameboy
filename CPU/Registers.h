@@ -6,6 +6,7 @@
 #define GAMEBOY_REGISTERS_H
 
 #include <cstdint>
+#include <string>
 
 namespace Gameboy {
     namespace CPU {
@@ -21,6 +22,8 @@ namespace Gameboy {
             H = 7
         };
 
+        std::string RegisterIndexToString(RegisterIndex registerIndex);
+
         enum RegisterIndex16 : std::uint8_t {
             AF = 0,
             BC = 2,
@@ -29,6 +32,8 @@ namespace Gameboy {
             SP = 8,
             PC = 10
         };
+
+        std::string RegisterIndexToString16(RegisterIndex16 registerIndex16);
 
         enum FlagRegister : std::uint8_t {
             CarryFlag = (1 << 4),

@@ -41,11 +41,20 @@ int main(int argc, char * argv[]) {
         mmap.setTimer(timer);
 
         cout << cartridge << endl;
+
+        // Print out disassembly
+
+        /*vector<DebugInstruction> debugInstructions = cpu.disassemble(1000);
+        for (const DebugInstruction& dbgInstr : debugInstructions) {
+            cout << dbgInstr.toString() << endl;
+        }*/
+
         cout << "Starting Execution" << endl;
         std::uint32_t clock;
         std::uint32_t duration;
         while(true) {
             clock = cpu.getTicks();
+            cout << cpu.disassembleNext().toString() << endl;
             cpu.next();
             duration = cpu.getTicks() - clock;
             //cout << "clock: " << clock << " duration: " << duration << endl;

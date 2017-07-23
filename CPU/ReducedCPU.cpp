@@ -12,7 +12,6 @@ using namespace Gameboy::General;
 
 using namespace Gameboy::CPU;
 
-const uint8_t Gameboy::CPU::ReducedCPU::regMap[8] = {B, C, D, E, H, L, HL, A};
 const uint8_t Gameboy::CPU::ReducedCPU::reg16Map[4] = {BC, DE, HL, SP};
 const uint8_t Gameboy::CPU::ReducedCPU::reg16MapLdInc[4] = {BC, DE, HL, HL};
 const uint8_t Gameboy::CPU::ReducedCPU::reg16MapPopPush[4] = {BC, DE, HL, AF};
@@ -56,15 +55,11 @@ const ReducedInstruction Gameboy::CPU::ReducedCPU::instructions2[16] = {
 };
 
 ReducedCPU::ReducedCPU(Memory::MemoryMappedIO &p_mmap)
-    : mmap ( p_mmap ),
+    : AbstractLR35902CPU ( p_mmap ),
       currentPC (),
       currentInstruction (), //
-      isCurrentExtended (), //
-      interruptMasterEnable (),
-      ticks ()
-{
-
-}
+      isCurrentExtended () //
+{}
 
 uint32_t ReducedCPU::getTicks() const {
     return ticks;
@@ -90,7 +85,6 @@ void ReducedCPU::next() {
         currentPC = registers.read16(PC);
         currentInstruction = mmap.read(currentPC);
         incrementProgramCounterBy(1);
-        // read next instruction
     }
 
     // Decode and Execute

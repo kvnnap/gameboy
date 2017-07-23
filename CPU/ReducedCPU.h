@@ -7,7 +7,7 @@
 
 #include "Memory/MemoryMappedIO.h"
 #include "Registers.h"
-#include "IInterruptible.h"
+#include "AbstractLR35902CPU.h"
 #include "ReducedInstruction.h"
 
 namespace Gameboy {
@@ -15,33 +15,28 @@ namespace Gameboy {
 
         // Gameboy CPU LR35902
         class ReducedCPU
-            : public IInterruptible
+            : public AbstractLR35902CPU
         {
         public:
 
             ReducedCPU(Memory::MemoryMappedIO& p_mmap);
 
-            std::uint32_t getTicks() const;
-            void next();
+            std::uint32_t getTicks() const override;
+            void next() override;
 
             void requestInterrupt(std::uint8_t irqLine) override;
 
         private:
             static const ReducedInstruction instructions[16];
             static const ReducedInstruction instructions2[16];
-            static const uint8_t regMap[8];
             static const uint8_t reg16Map[4];
             static const uint8_t reg16MapLdInc[4];
             static const uint8_t reg16MapPopPush[4];
 
-            Registers registers;
-            Memory::MemoryMappedIO& mmap;
             uint16_t currentPC;
             uint8_t currentInstruction;
             bool isCurrentExtended;
-            bool interruptMasterEnable;
 
-            uint32_t ticks;
 
             uint8_t rowSelector; // 2-bit row selector
             uint8_t splitRowSelector; // 3-bit row divided by two selector

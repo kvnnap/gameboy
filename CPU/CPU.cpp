@@ -52,7 +52,7 @@ const Instruction Gameboy::CPU::CPU::instructions[128] = {
         {1,  8,  0, HL, HL, &CPU::inc_reg16},             // 0x23 INC HL
         {1,  4,  0,  H,  H, &CPU::inc_reg8},              // 0x24 INC  H // Flags
         {1,  4,  0,  H,  H, &CPU::dec_reg8},              // 0x25 DEC  H // Flags
-        {2,  8,  0,  H,  0, &CPU::load_d8_to_reg},        // 0x26 LD  D,  d8
+        {2,  8,  0,  H,  0, &CPU::load_d8_to_reg},        // 0x26 LD  H,  d8
         {1,  4,  0,  A,  A, &CPU::daa},                   // 0x27 DAA    // Flags TODO: Check
         {2, 12,  8, PC,  0, &CPU::rel_z_jmp},             // 0x28 JR  Z, r8
         {1,  8,  0, HL, HL, &CPU::add_reg16_to_reg16},    // 0x29 ADD HL, HL // Flags
@@ -153,13 +153,9 @@ const Instruction Gameboy::CPU::CPU::instructions[128] = {
         {1,  16,  0, SP, PC, &CPU::rst}                   // 0xFF RST $38
 };
 
-const uint8_t Gameboy::CPU::CPU::regMap[8] = {B, C, D, E, H, L, HL, A};
-
 CPU::CPU(Memory::MemoryMappedIO& p_mmap)
-    : mmap ( p_mmap ),
-      currentPC (),
-      interruptMasterEnable (),
-      ticks ()
+    : AbstractLR35902CPU (p_mmap),
+      currentPC ()
 {}
 
 // Utils
@@ -914,7 +910,7 @@ void CPU::next() {
             // ticks for loads
             ticks += isMemoryOperation ? 8 : 4;
         } else {
-            const Instruction *instruction = &instructions[rangeNum ? (currentInstruction & 0x7F) : currentInstruction];
+            const Instruction *instruction = &instructions[currentInstruction & 0x7F];
             incrementProgramCounterBy(instruction->length);
             uint8_t cycles = instruction->cycles;
             if (instruction->execfn != nullptr) {
