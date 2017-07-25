@@ -5,7 +5,7 @@
 #ifndef GAMEBOY_ENGINEFACTORY_H
 #define GAMEBOY_ENGINEFACTORY_H
 
-#include "Factory/IFactory.h"
+#include "General/IFactory.h"
 #include "Engine/IEngine.h"
 #include "Engine/RuntimeEngine.h"
 
@@ -14,7 +14,7 @@ namespace Gameboy
     namespace Engine
     {
         class EngineFactory
-            : public Factory::IFactory<IEngine>
+            : public IFactory<IEngine>
         {
         public:
             std::unique_ptr<IEngine> make(const std::string& name) const override;

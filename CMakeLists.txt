@@ -22,6 +22,7 @@ find_package(SDL2 REQUIRED)
 file(GLOB_RECURSE SOURCE_FILES
      Cartridge/*.cpp
      CPU/*.cpp
+     Engine/*.cpp
      General/*.cpp
      GPU/*.cpp
      Input/*.cpp
