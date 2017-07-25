@@ -5,7 +5,7 @@
 #ifndef GAMEBOY_RUNTIMEENGINE_H
 #define GAMEBOY_RUNTIMEENGINE_H
 
-#include "IEngine.h"
+#include "Engine/IEngine.h"
 
 namespace Gameboy {
     namespace Engine {
@@ -16,7 +16,7 @@ namespace Gameboy {
 
             RuntimeEngine();
 
-            void start(const std::string& catridgeFileName) override;
+            void start(const std::string& cartridgeFileName) override;
         };
     }
 }

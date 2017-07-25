@@ -2,6 +2,8 @@
 // Created by kvnna on 23/07/2017.
 //
 
+#include <sstream>
+#include <iomanip>
 #include "DebugInstruction.h"
 
 using namespace std;
@@ -24,5 +26,7 @@ DebugInstruction::DebugInstruction(const std::string& strInstruction, std::uint8
 {}
 
 std::string DebugInstruction::toString() const {
-    return to_string(Address) + ": " + to_string(Opcode) + ": " + StringInstruction;
+    stringstream ss;
+    ss << hex << setw(4) << Address << " : " << setw(2) << static_cast<uint16_t>(Opcode) << " : " << StringInstruction;
+    return ss.str();
 }

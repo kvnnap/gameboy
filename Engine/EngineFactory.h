@@ -7,7 +7,6 @@
 
 #include "General/IFactory.h"
 #include "Engine/IEngine.h"
-#include "Engine/RuntimeEngine.h"
 
 namespace Gameboy
 {

@@ -323,3 +323,11 @@ vector<DebugInstruction> AbstractLR35902CPU::disassemble(std::size_t num) const 
 DebugInstruction AbstractLR35902CPU::disassembleNext() const {
     return fetchAndDecode(registers.read16(PC));
 }
+
+Registers &AbstractLR35902CPU::getRegisters() {
+    return registers;
+}
+
+bool AbstractLR35902CPU::isInterruptMasterEnabled() const {
+    return interruptMasterEnable;
+}

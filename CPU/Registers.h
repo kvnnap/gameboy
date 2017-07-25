@@ -47,6 +47,7 @@ namespace Gameboy {
 
             std::uint16_t read16 (std::uint8_t srcIndex) const;
             void write16 (std::uint8_t destIndex, std::uint16_t value);
+            std::string toString() const;
 
             Registers();
 

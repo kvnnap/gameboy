@@ -25,6 +25,9 @@ namespace Gameboy {
             DebugInstruction disassembleNext() const override;
             std::vector<DebugInstruction> disassemble(std::size_t num) const override;
 
+            Registers& getRegisters() override ;
+            bool isInterruptMasterEnabled() const override ;
+
         protected:
             // Maps
             static const uint8_t regMap[8];
