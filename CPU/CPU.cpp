@@ -277,7 +277,7 @@ std::uint8_t CPU::load_reg8_to_d8pt(const Instruction &instruction) {
 }
 
 std::uint8_t CPU::load_reg8_to_reg8pt(const Instruction &instruction) {
-    mmap.write(static_cast<uint16_t>(0xFF00 | mmap.read(registers.reg[instruction.destRegIndex])),
+    mmap.write(static_cast<uint16_t>(0xFF00 | registers.reg[instruction.destRegIndex]),
                registers.reg[instruction.srcRegIndex]);
     return instruction.cycles;
 }

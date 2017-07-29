@@ -7,6 +7,7 @@
 #include "Cartridge/Cartridge.h"
 #include "Memory/MemoryMappedIO.h"
 #include "CPU/CPU.h"
+#include "CPU/ReducedCPU.h"
 #include "CPU/Registers.h"
 #include "CPU/DebugInstruction.h"
 #include "General/StringOperations.h"

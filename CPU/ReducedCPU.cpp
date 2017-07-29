@@ -683,7 +683,7 @@ std::uint8_t ReducedCPU::load_reg8_to_reg8pt_vv() {
     if ((currentInstruction & 0x08) == 0) { // LD A,(C) has alternative mnemonic LD A,($FF00+C), LD C,(A) has alternative mnemonic LD ($FF00+C),A
         incrementProgramCounterBy(2);
         if (rowSelector == 2) {
-            mmap.write(static_cast<uint16_t>(0xFF00 | mmap.read(registers.reg[C])), registers.reg[A]);
+            mmap.write(static_cast<uint16_t>(0xFF00 | registers.reg[C]), registers.reg[A]);
         } else {
             registers.reg[A] = mmap.read(static_cast<uint16_t>(0xFF00 | registers.reg[C]));
         }
