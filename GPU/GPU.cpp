@@ -3,13 +3,15 @@
 //
 
 #include <stdexcept>
-#include "GPU.h"
+#include "GPU/GPU.h"
 
 using namespace std;
 using namespace Gameboy::GPU;
+using namespace Gameboy::General;
 
-GPU::GPU(Gameboy::CPU::IInterruptible &p_interruptible, IVideoOutputDevice& p_outputDevice)
+GPU::GPU(Gameboy::CPU::IInterruptible &p_interruptible, IReadable& p_readableMemoryMappedIO, IVideoOutputDevice& p_outputDevice)
     : interruptible (p_interruptible),
+      readableMemoryMappedIO (p_readableMemoryMappedIO),
       outputDevice (p_outputDevice),
       frameBuffer (160 * 144),
       clock (),
@@ -187,7 +189,17 @@ void GPU::write(uint16_t address, uint8_t datum) {
             case OffLY:   // 0xFF44
                 throw runtime_error("Attempted write to LY Register, datum:" + to_string(static_cast<uint32_t>(datum)));
             case OffLYC:  // 0xFF45
+                gpuReg[offset] = datum;
+                break;
             case OffDMA:  // 0xFF46
+                // Perform DMA transfer
+            {
+                const uint16_t baseAddress = static_cast<uint16_t>(datum) << 8;
+                for (uint8_t i = 0; i < (UnusableIO1 - SpriteRam); ++i) {
+                    write(SpriteRam + i, readableMemoryMappedIO.read(baseAddress + i));
+                }
+            }
+                break;
             case OffBGP:  // 0xFF47
             case OffOBP0: // 0xFF48
             case OffOBP1: // 0xFF49

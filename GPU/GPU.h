@@ -79,7 +79,9 @@ namespace Gameboy {
         {
         public:
 
-            GPU(CPU::IInterruptible& p_interruptible, IVideoOutputDevice& p_outputDevice);
+            GPU(CPU::IInterruptible& p_interruptible,
+                General::IReadable& readableMemoryMappedIO,
+                IVideoOutputDevice& p_outputDevice);
 
             void next(std::uint32_t ticks) override;
 
@@ -90,6 +92,7 @@ namespace Gameboy {
 
         private:
             CPU::IInterruptible& interruptible;
+            General::IReadable& readableMemoryMappedIO; // Used for DMA
             IVideoOutputDevice& outputDevice;
 
             Memory::ReadableWritableMemory videoRam;  // 0x8000 - 0x9FFF (8KB)

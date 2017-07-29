@@ -29,7 +29,7 @@ void RuntimeEngine::start(const string& cartridgeFileName) {
     CPU::CPU cpu (mmap);
     Input::Joypad joypad (cpu);
     GPU::SDLVideoDevice sdlVideoDevice;
-    GPU::GPU gpu (cpu, sdlVideoDevice);
+    GPU::GPU gpu (cpu, mmap, sdlVideoDevice);
     Timer::Timer timer (cpu);
 
     // Set Memory Mapped I/O
