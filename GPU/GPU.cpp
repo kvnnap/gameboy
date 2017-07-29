@@ -87,7 +87,7 @@ bool GPU::isWindowDisplayOn() const {
 
 uint16_t GPU::getBgWindowTileDataOffset() const {
     // When 9000, signed addressing is used then (0x8800 - 0x8FFF)
-    return static_cast<uint16_t>((gpuReg[OffLCDC] & (1 << 4)) ? 0x9000 : 0x8000) - VideoRam;
+    return static_cast<uint16_t>((gpuReg[OffLCDC] & (1 << 4)) ? 0x8000 : 0x9000) - VideoRam;
 }
 
 uint16_t GPU::getBgWindowTileMapOffset() const {
@@ -196,7 +196,12 @@ void GPU::write(uint16_t address, uint8_t datum) {
             {
                 const uint16_t baseAddress = static_cast<uint16_t>(datum) << 8;
                 for (uint8_t i = 0; i < (UnusableIO1 - SpriteRam); ++i) {
-                    write(SpriteRam + i, readableMemoryMappedIO.read(baseAddress + i));
+                    //write(SpriteRam + i, readableMemoryMappedIO.read(baseAddress + i));
+                    // Rough implementation, need to emulate more
+                    // TODO: This takes 671 ticks, data wriging should be probably emulated
+                    // during this course of time. Or at the very least, lock the whole memory map
+                    // except High Ram.
+                    spriteRam.writeExt(i, readableMemoryMappedIO.read(baseAddress + i));
                 }
             }
                 break;
@@ -235,7 +240,7 @@ void GPU::renderScanLine() {
         uint8_t tileNumber = videoRam.readExt(mapOffset + (yTileOffset << 5) + xTileOffset);
 
         // Get tile address
-        uint16_t tileAddress = dataOffset + negativeAddressing ? (static_cast<int8_t>(tileNumber) << 4) : tileNumber << 4;
+        uint16_t tileAddress = dataOffset + (negativeAddressing ? (static_cast<int8_t>(tileNumber) << 4) : tileNumber << 4);
 
         // Tile x-Pixel Index
         const uint8_t tileXPixelIndex = xVal & static_cast<uint8_t>(0x07);

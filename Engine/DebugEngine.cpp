@@ -28,40 +28,49 @@ void DebugEngine::start(const string &cartridgeFileName) {
     // Load Cartridge
     Cartridge::Cartridge cartridge (cartridgeFileName);
 
+    cout << cartridge << endl;
     // Setup Devices
-    Memory::MemoryMappedIO mmap (cartridge.getMBC());
-    CPU::CPU cpu (mmap);
-    Input::Joypad joypad (cpu);
+    Memory::MemoryMappedIO mmap(cartridge.getMBC());
+    CPU::CPU cpu(mmap);
+    Input::Joypad joypad(cpu);
     GPU::SDLVideoDevice sdlVideoDevice;
-    GPU::GPU gpu (cpu, mmap, sdlVideoDevice);
-    Timer::Timer timer (cpu);
+    GPU::GPU gpu(cpu, mmap, sdlVideoDevice);
+    Timer::Timer timer(cpu);
 
     // Set Memory Mapped I/O
     mmap.setInput(joypad);
     mmap.setGpu(gpu);
     mmap.setTimer(timer);
 
-    // Print out disassembly
+    try {
+        uint32_t clock;
+        uint32_t duration;
+        bool running = true;
+        while (running) {
 
-
-
-    uint32_t clock;
-    uint32_t duration;
-    bool running = true;
-    while (running) {
-
-        if (needToBreak(cpu)) {
-            running = processInput(cpu);
-            if (!running) {
-                continue;
+            if (needToBreak(cpu)) {
+                running = processInput(cpu);
+                if (!running) {
+                    continue;
+                }
             }
-        }
 
-        clock = cpu.getTicks();
-        cpu.next();
-        duration = cpu.getTicks() - clock;
-        gpu.next(duration);
-        timer.next(duration);
+            clock = cpu.getTicks();
+            cpu.next();
+            duration = cpu.getTicks() - clock;
+            gpu.next(duration);
+            timer.next(duration);
+        }
+    } catch (...) {
+        using namespace Gameboy::CPU;
+        cout << cpu.getRegisters().toString() << endl;
+        cout << "EI: " << (cpu.isInterruptMasterEnabled() ? "1" : "0") << endl;
+        cout << "Ticks: " << cpu.getTicks() << endl;
+        vector<DebugInstruction> debugInstructions = cpu.disassemble(3);
+        for (const DebugInstruction& dbgInstr : debugInstructions) {
+            cout << dbgInstr.toString() << endl;
+        }
+        throw;
     }
 }
 

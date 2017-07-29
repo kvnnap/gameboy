@@ -561,7 +561,7 @@ std::uint8_t CPU::jmp (const Instruction& instruction) {
 
 std::uint8_t CPU::jmp_regpt (const Instruction& instruction) {
     // destRegIndex must be PC
-    registers.write16(instruction.destRegIndex, mmap.read16(registers.read16(instruction.srcRegIndex)));
+    registers.write16(instruction.destRegIndex, registers.read16(instruction.srcRegIndex));
     return instruction.cycles;
 }
 

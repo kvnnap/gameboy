@@ -220,7 +220,7 @@ DebugInstruction AbstractLR35902CPU::fetchAndDecode(uint16_t pc) const {
                     std::snprintf(buff, sizeof(buff), strInstruction.c_str(),
                                   RegisterIndexToString(static_cast<RegisterIndex>(regIndex)).c_str());
                 } else {
-                    strInstruction += isMemoryOperation ? "%s, (HL)" : " %s, %s";
+                    strInstruction += isMemoryOperation ? " %s, (HL)" : " %s, %s";
                     std::snprintf(buff, sizeof(buff), strInstruction.c_str(),
                                   RegisterIndexToString(static_cast<RegisterIndex>(destRegIndex)).c_str(),
                                   RegisterIndexToString(static_cast<RegisterIndex>(regIndex)).c_str());
