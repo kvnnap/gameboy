@@ -78,7 +78,7 @@ bool GPU::isLcdOn() const {
 }
 
 uint16_t GPU::getWindowTileMapOffset() const {
-    return static_cast<uint16_t>((gpuReg[OffLCDC] & (1 << 6)) ? 0x9C00 : 0x9800);
+    return static_cast<uint16_t>((gpuReg[OffLCDC] & (1 << 6)) ? 0x9C00 : 0x9800) - VideoRam;
 }
 
 bool GPU::isWindowDisplayOn() const {
@@ -86,7 +86,7 @@ bool GPU::isWindowDisplayOn() const {
 }
 
 uint16_t GPU::getBgWindowTileDataOffset() const {
-    // When 9000, signed addressing is used then (0x8800 - 0x8FFF)
+    // When 9000, signed addressing is used
     return static_cast<uint16_t>((gpuReg[OffLCDC] & (1 << 4)) ? 0x8000 : 0x9000) - VideoRam;
 }
 
@@ -219,42 +219,54 @@ void GPU::write(uint16_t address, uint8_t datum) {
 }
 
 void GPU::renderScanLine() {
-    // Tile map!
-    const uint16_t mapOffset = getBgWindowTileMapOffset();
-    const uint16_t dataOffset = getBgWindowTileDataOffset();
-    const bool negativeAddressing = dataOffset != 0;
+    
+    if (isBgWindowDisplayOn()) {
 
-    // Pixel offsets
-    const uint8_t xOffset = gpuReg[OffSCX];
-    const uint8_t yOffset = gpuReg[OffSCY] + gpuReg[OffLY];
+        // Tile map!
+        const uint16_t mapOffset = getBgWindowTileMapOffset();
+        const uint16_t dataOffset = getBgWindowTileDataOffset();
+        const bool negativeAddressing = dataOffset != 0;
 
-    // Tile offsets
-    const uint8_t yTileOffset = yOffset >> 3; // Divide by 8
-    const uint8_t tileLineIndex = yOffset & static_cast<uint8_t>(0x07);
+        // Pixel offsets
+        const uint8_t xOffset = gpuReg[OffSCX];
+        const uint8_t yOffset = gpuReg[OffSCY] + gpuReg[OffLY];
 
-    for (uint8_t x = 0; x < 160; ++x) {
-        uint8_t xVal = xOffset + x;
-        uint8_t xTileOffset = xVal >> 3;
+        // Tile offsets - Divide by 8 since tiles are 8x8 and division will transform
+        // view from pixel coordinates to tile coordinates
+        const uint8_t yTileOffset = yOffset >> 3; // Divide by 8
 
-        // Get tile number - multiply yTileOffset by 32
-        uint8_t tileNumber = videoRam.readExt(mapOffset + (yTileOffset << 5) + xTileOffset);
+        // Select one of the 8 rows found in the tile
+        const uint8_t tileLineIndex = yOffset & static_cast<uint8_t>(0x07);
 
-        // Get tile address
-        uint16_t tileAddress = dataOffset + (negativeAddressing ? (static_cast<int8_t>(tileNumber) << 4) : tileNumber << 4);
+        for (uint8_t x = 0; x < 160; ++x) {
+            const uint8_t xVal = xOffset + x;
 
-        // Tile x-Pixel Index
-        const uint8_t tileXPixelIndex = xVal & static_cast<uint8_t>(0x07);
+            // Divide by 8 to transform from pixel coordinates to tile coordinates
+            const uint8_t xTileOffset = xVal >> 3;
 
-        // Get 2-bit value
-        uint16_t finalAddress = tileAddress + (tileLineIndex << 1);
-        uint8_t pixelValue = static_cast<uint8_t >((videoRam.readExt(finalAddress + 1) & (1 << (7 - tileXPixelIndex))) ? 2 : 0);
-        pixelValue |= (videoRam.readExt(finalAddress) >> (7 - tileXPixelIndex)) & 1;
+            // Get tile number from tile map - multiply yTileOffset by 32 as there are 32 tiles within one row
+            const uint8_t tileNumber = videoRam.readExt(mapOffset + (yTileOffset << 5) + xTileOffset);
 
-        // Get palette colour value
-        uint8_t colorIndexValue = static_cast<uint8_t >((gpuReg[OffBGP] >> (pixelValue << 1)) & 0x03);
+            // Get tile address from the tile index, this address is used to compose the final address
+            // to read data from the tile data region
+            const uint16_t tileAddress =
+                    dataOffset + (negativeAddressing ? (static_cast<int8_t>(tileNumber) << 4) : tileNumber << 4);
 
-        // Commit to framebuffer
-        frameBuffer[gpuReg[OffLY] * 160 + x] = colors[colorIndexValue];
+            // Tile x-Pixel Index
+            const uint8_t tileXPixelIndex = xVal & static_cast<uint8_t>(0x07);
+
+            // Get 2-bit value - multiply tileLineIndex by two as each line is composed of 2-bytes
+            const uint16_t finalAddress = tileAddress + (tileLineIndex << 1);
+            uint8_t pixelValue = static_cast<uint8_t>((videoRam.readExt(finalAddress + 1) &
+                                                        (1 << (7 - tileXPixelIndex))) ? 2 : 0);
+            pixelValue |= (videoRam.readExt(finalAddress) >> (7 - tileXPixelIndex)) & 1;
+
+            // Get palette colour value
+            const uint8_t colorIndexValue = static_cast<uint8_t>((gpuReg[OffBGP] >> (pixelValue << 1)) & 0x03);
+
+            // Commit to frame buffer
+            frameBuffer[gpuReg[OffLY] * 160 + x] = colors[colorIndexValue];
+        }
     }
 }
 

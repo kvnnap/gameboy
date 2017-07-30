@@ -14,7 +14,7 @@ int main(int argc, char * argv[]) {
             throw runtime_error("No file supplied");
         }
 
-        unique_ptr<IEngine> engine = EngineFactory().make("DebugEngine");
+        unique_ptr<IEngine> engine = EngineFactory().make("RuntimeEngine");
 
         engine->start(argv[1]);
 

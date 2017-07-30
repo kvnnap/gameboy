@@ -13,6 +13,7 @@
 #include "Timer/Timer.h"
 #include "CPU/CPU.h"
 #include "CPU/ReducedCPU.h"
+#include <iostream>
 
 using namespace std;
 using namespace Gameboy::Engine;
@@ -23,6 +24,7 @@ void RuntimeEngine::start(const string& cartridgeFileName) {
 
     // Load Cartridge
     Cartridge::Cartridge cartridge (cartridgeFileName);
+    cout << cartridge << endl;
 
     // Setup Devices
     Memory::MemoryMappedIO mmap (cartridge.getMBC());
