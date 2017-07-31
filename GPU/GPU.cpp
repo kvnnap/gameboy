@@ -13,10 +13,10 @@ GPU::GPU(Gameboy::CPU::IInterruptible &p_interruptible, IReadable& p_readableMem
     : interruptible (p_interruptible),
       readableMemoryMappedIO (p_readableMemoryMappedIO),
       outputDevice (p_outputDevice),
-      frameBuffer (160 * 144),
+      frameBuffer (WIDTH * HEIGHT),
       clock (),
       gpuReg (),
-      colors {0xFFFFFFFF, 0xFFC0C0C0, 0xFF606060, 0xFF000000},
+      colors {COLOUR0, COLOUR1, COLOUR2, COLOUR3},
       windowYPosition (),
       lastWindowYPosition ()
 {
@@ -37,7 +37,7 @@ void GPU::next(uint32_t ticks) {
                 // next mode is either mode 1 - VBlank or mode 2 - OAMUsed
                 clock -= 204;
                 incrementLY();
-                if (gpuReg[OffLY] == 144) {
+                if (gpuReg[OffLY] == HEIGHT) {
                     outputDevice.render(frameBuffer.data());
                     setMode(VBlank);
                     // Frame is ready, commit it
@@ -238,7 +238,7 @@ void GPU::renderScanLine() {
     const uint16_t backgroundMapOffset = getBgTileMapOffset();
     const uint16_t windowMapOffset = getWindowTileMapOffset();
 
-    for (uint8_t x = 0; (bgEnabled || windowEnabled) && (x < 160); ++x) {
+    for (uint8_t x = 0; x < WIDTH; ++x) {
 
         // Determine whether to draw using window or background
         uint16_t mapOffset;
@@ -247,18 +247,22 @@ void GPU::renderScanLine() {
         uint8_t xOffset;
         uint8_t yOffset;
 
-        if (windowEnabled && x >= alteredWX && x <= alteredWX) {
+        if (windowEnabled && (x >= alteredWX) && (x <= alteredWX)) {
             // Use window
             mapOffset = windowMapOffset;
             xOffset = x - alteredWX;
             // Handle case where window is interrupted and resumed at a later line
             // This value is updated to WY upon exiting VBLANK
             yOffset = lastWindowYPosition++;
-        } else {
+        } else if (bgEnabled) {
             // Use background
             mapOffset = backgroundMapOffset;
             xOffset = gpuReg[OffSCX] + x;
             yOffset = gpuReg[OffSCY] + gpuReg[OffLY];
+        } else {
+            // Commit to frame buffer the colour 0 - White
+            frameBuffer[gpuReg[OffLY] * WIDTH + x] = colors[0];
+            continue;
         }
 
         // Tile offsets - Divide by 8 since tiles are 8x8 and division will transform
@@ -294,7 +298,7 @@ void GPU::renderScanLine() {
         const uint8_t colorIndexValue = static_cast<uint8_t>((gpuReg[OffBGP] >> (pixelValue << 1)) & 0x03);
 
         // Commit to frame buffer
-        frameBuffer[gpuReg[OffLY] * 160 + x] = colors[colorIndexValue];
+        frameBuffer[gpuReg[OffLY] * WIDTH + x] = colors[colorIndexValue];
     }
 }
 

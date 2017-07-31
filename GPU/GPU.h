@@ -74,6 +74,18 @@ namespace Gameboy {
             StatIrq = 1
         };
 
+        enum ScreenSize : std::uint8_t {
+            WIDTH = 160,
+            HEIGHT = 144
+        };
+
+        enum ScreenColour : std::uint32_t {
+            COLOUR0 = 0xFFFFFFFF,
+            COLOUR1 = 0xFFC0C0C0,
+            COLOUR2 = 0xFF606060,
+            COLOUR3 = 0xFF000000
+        };
+
         class GPU
             : public General::IReadableWritable, public General::ITick
         {
