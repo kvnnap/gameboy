@@ -117,6 +117,8 @@ namespace Gameboy {
 
             uint32_t colors[4];
 
+            uint8_t lastWindowYPosition;
+
             // Methods
 
             // LCDC
@@ -124,10 +126,11 @@ namespace Gameboy {
             std::uint16_t getWindowTileMapOffset() const;
             bool isWindowDisplayOn() const;
             std::uint16_t getBgWindowTileDataOffset() const;
-            std::uint16_t getBgWindowTileMapOffset() const;
+            std::uint16_t getBgTileMapOffset() const;
             std::uint8_t getSpriteHeight() const;
             bool isSpriteDisplayOn() const;
-            bool isBgWindowDisplayOn() const;
+            // This bit would also disable windows - but only in gameboy colour
+            bool isBgDisplayOn() const;
 
             // STAT
             void setMode(Mode mode);

@@ -16,7 +16,8 @@ GPU::GPU(Gameboy::CPU::IInterruptible &p_interruptible, IReadable& p_readableMem
       frameBuffer (160 * 144),
       clock (),
       gpuReg (),
-      colors {0xFFFFFFFF, 0xFFC0C0C0, 0xFF606060, 0xFF000000}
+      colors {0xFFFFFFFF, 0xFFC0C0C0, 0xFF606060, 0xFF000000},
+      lastWindowYPosition ()
 {
     gpuReg[OffSTAT] = OAMUsed;
     videoRam.initialise(Memory::MemoryType(8192));
@@ -49,6 +50,7 @@ void GPU::next(uint32_t ticks) {
                 clock -= 456;
                 incrementLY();
                 if (gpuReg[OffLY] == 0) {
+                    lastWindowYPosition = gpuReg[OffWY];
                     setMode(OAMUsed);
                 }
             }
@@ -90,7 +92,7 @@ uint16_t GPU::getBgWindowTileDataOffset() const {
     return static_cast<uint16_t>((gpuReg[OffLCDC] & (1 << 4)) ? 0x8000 : 0x9000) - VideoRam;
 }
 
-uint16_t GPU::getBgWindowTileMapOffset() const {
+uint16_t GPU::getBgTileMapOffset() const {
     return static_cast<uint16_t>((gpuReg[OffLCDC] & (1 << 3)) ? 0x9C00 : 0x9800) - VideoRam;
 }
 
@@ -102,7 +104,7 @@ bool GPU::isSpriteDisplayOn() const {
     return (gpuReg[OffLCDC] & (1 << 1)) != 0;
 }
 
-bool GPU::isBgWindowDisplayOn() const {
+bool GPU::isBgDisplayOn() const {
     return (gpuReg[OffLCDC] & (1 << 0)) != 0;
 }
 
@@ -219,17 +221,43 @@ void GPU::write(uint16_t address, uint8_t datum) {
 }
 
 void GPU::renderScanLine() {
-    
-    if (isBgWindowDisplayOn()) {
 
-        // Tile map!
-        const uint16_t mapOffset = getBgWindowTileMapOffset();
-        const uint16_t dataOffset = getBgWindowTileDataOffset();
-        const bool negativeAddressing = dataOffset != 0;
+    const bool bgEnabled = isBgDisplayOn();
+    const bool windowEnabled = isWindowDisplayOn()
+                               && (/*gpuReg[OffWY]*/ lastWindowYPosition <= gpuReg[OffLY])
+                               && (gpuReg[OffWX] <= 166);
+    const uint8_t alteredWX = static_cast<uint8_t>(gpuReg[OffWX] >= 7 ? gpuReg[OffWX] - 7 : 0);
+
+    // Data offset for both background and window
+    const uint16_t dataOffset = getBgWindowTileDataOffset();
+    const bool negativeAddressing = dataOffset != 0;
+
+    // Get the background and Window Map
+    const uint16_t backgroundMapOffset = getBgTileMapOffset();
+    const uint16_t windowMapOffset = getWindowTileMapOffset();
+
+    for (uint8_t x = 0; (bgEnabled || windowEnabled) && (x < 160); ++x) {
+
+        // Determine whether to draw using window or background
+        uint16_t mapOffset;
 
         // Pixel offsets
-        const uint8_t xOffset = gpuReg[OffSCX];
-        const uint8_t yOffset = gpuReg[OffSCY] + gpuReg[OffLY];
+        uint8_t xOffset;
+        uint8_t yOffset;
+
+        if (windowEnabled && x >= alteredWX && x <= alteredWX) {
+            // Use window
+            mapOffset = windowMapOffset;
+            xOffset = 0;
+            // Handle case where window is interrupted and resumed at a later line
+            // This value is updated to WY upon exiting VBLANK
+            yOffset = lastWindowYPosition++;
+        } else {
+            // Use background
+            mapOffset = backgroundMapOffset;
+            xOffset = gpuReg[OffSCX];
+            yOffset = gpuReg[OffSCY] + gpuReg[OffLY];
+        }
 
         // Tile offsets - Divide by 8 since tiles are 8x8 and division will transform
         // view from pixel coordinates to tile coordinates
@@ -238,35 +266,36 @@ void GPU::renderScanLine() {
         // Select one of the 8 rows found in the tile
         const uint8_t tileLineIndex = yOffset & static_cast<uint8_t>(0x07);
 
-        for (uint8_t x = 0; x < 160; ++x) {
-            const uint8_t xVal = xOffset + x;
+        const uint8_t xVal = xOffset + x;
 
-            // Divide by 8 to transform from pixel coordinates to tile coordinates
-            const uint8_t xTileOffset = xVal >> 3;
+        // Divide by 8 to transform from pixel coordinates to tile coordinates
+        const uint8_t xTileOffset = xVal >> 3;
 
-            // Get tile number from tile map - multiply yTileOffset by 32 as there are 32 tiles within one row
-            const uint8_t tileNumber = videoRam.readExt(mapOffset + (yTileOffset << 5) + xTileOffset);
+        // Get tile number from tile map - multiply yTileOffset by 32 as there are 32 tiles within one row
+        const uint8_t tileNumber = videoRam.readExt(mapOffset +
+                                          // & ~0x400 is the same as % 1024
+                                          static_cast<size_t>(((yTileOffset << 5) + xTileOffset) & ~0x400));
 
-            // Get tile address from the tile index, this address is used to compose the final address
-            // to read data from the tile data region
-            const uint16_t tileAddress =
-                    dataOffset + (negativeAddressing ? (static_cast<int8_t>(tileNumber) << 4) : tileNumber << 4);
+        // Get tile address from the tile index, this address is used to compose the final address
+        // to read data from the tile data region
+        const uint16_t tileAddress =
+                dataOffset + (negativeAddressing ? (static_cast<int8_t>(tileNumber) << 4) : tileNumber << 4);
 
-            // Tile x-Pixel Index
-            const uint8_t tileXPixelIndex = xVal & static_cast<uint8_t>(0x07);
+        // Tile x-Pixel Index
+        const uint8_t tileXPixelIndex = xVal & static_cast<uint8_t>(0x07);
 
-            // Get 2-bit value - multiply tileLineIndex by two as each line is composed of 2-bytes
-            const uint16_t finalAddress = tileAddress + (tileLineIndex << 1);
-            uint8_t pixelValue = static_cast<uint8_t>((videoRam.readExt(finalAddress + 1) &
-                                                        (1 << (7 - tileXPixelIndex))) ? 2 : 0);
-            pixelValue |= (videoRam.readExt(finalAddress) >> (7 - tileXPixelIndex)) & 1;
+        // Get 2-bit value - multiply tileLineIndex by two as each line is composed of 2-bytes
+        const uint16_t finalAddress = tileAddress + (tileLineIndex << 1);
+        uint8_t pixelValue = static_cast<uint8_t>((videoRam.readExt(finalAddress + 1) &
+                                                    (1 << (7 - tileXPixelIndex))) ? 2 : 0);
+        pixelValue |= (videoRam.readExt(finalAddress) >> (7 - tileXPixelIndex)) & 1;
 
-            // Get palette colour value
-            const uint8_t colorIndexValue = static_cast<uint8_t>((gpuReg[OffBGP] >> (pixelValue << 1)) & 0x03);
+        // Get palette colour value
+        const uint8_t colorIndexValue = static_cast<uint8_t>((gpuReg[OffBGP] >> (pixelValue << 1)) & 0x03);
 
-            // Commit to frame buffer
-            frameBuffer[gpuReg[OffLY] * 160 + x] = colors[colorIndexValue];
-        }
+        // Commit to frame buffer
+        frameBuffer[gpuReg[OffLY] * 160 + x] = colors[colorIndexValue];
     }
 }
+
 
