@@ -17,6 +17,7 @@ GPU::GPU(Gameboy::CPU::IInterruptible &p_interruptible, IReadable& p_readableMem
       clock (),
       gpuReg (),
       colors {0xFFFFFFFF, 0xFFC0C0C0, 0xFF606060, 0xFF000000},
+      windowYPosition (),
       lastWindowYPosition ()
 {
     gpuReg[OffSTAT] = OAMUsed;
@@ -50,7 +51,8 @@ void GPU::next(uint32_t ticks) {
                 clock -= 456;
                 incrementLY();
                 if (gpuReg[OffLY] == 0) {
-                    lastWindowYPosition = gpuReg[OffWY];
+                    windowYPosition = gpuReg[OffWY];
+                    lastWindowYPosition = 0;
                     setMode(OAMUsed);
                 }
             }
@@ -224,7 +226,7 @@ void GPU::renderScanLine() {
 
     const bool bgEnabled = isBgDisplayOn();
     const bool windowEnabled = isWindowDisplayOn()
-                               && (/*gpuReg[OffWY]*/ lastWindowYPosition <= gpuReg[OffLY])
+                               && (/*gpuReg[OffWY]*/ windowYPosition <= gpuReg[OffLY])
                                && (gpuReg[OffWX] <= 166);
     const uint8_t alteredWX = static_cast<uint8_t>(gpuReg[OffWX] >= 7 ? gpuReg[OffWX] - 7 : 0);
 
@@ -248,14 +250,14 @@ void GPU::renderScanLine() {
         if (windowEnabled && x >= alteredWX && x <= alteredWX) {
             // Use window
             mapOffset = windowMapOffset;
-            xOffset = 0;
+            xOffset = x - alteredWX;
             // Handle case where window is interrupted and resumed at a later line
             // This value is updated to WY upon exiting VBLANK
             yOffset = lastWindowYPosition++;
         } else {
             // Use background
             mapOffset = backgroundMapOffset;
-            xOffset = gpuReg[OffSCX];
+            xOffset = gpuReg[OffSCX] + x;
             yOffset = gpuReg[OffSCY] + gpuReg[OffLY];
         }
 
@@ -266,10 +268,8 @@ void GPU::renderScanLine() {
         // Select one of the 8 rows found in the tile
         const uint8_t tileLineIndex = yOffset & static_cast<uint8_t>(0x07);
 
-        const uint8_t xVal = xOffset + x;
-
         // Divide by 8 to transform from pixel coordinates to tile coordinates
-        const uint8_t xTileOffset = xVal >> 3;
+        const uint8_t xTileOffset = xOffset >> 3;
 
         // Get tile number from tile map - multiply yTileOffset by 32 as there are 32 tiles within one row
         const uint8_t tileNumber = videoRam.readExt(mapOffset +
@@ -282,7 +282,7 @@ void GPU::renderScanLine() {
                 dataOffset + (negativeAddressing ? (static_cast<int8_t>(tileNumber) << 4) : tileNumber << 4);
 
         // Tile x-Pixel Index
-        const uint8_t tileXPixelIndex = xVal & static_cast<uint8_t>(0x07);
+        const uint8_t tileXPixelIndex = xOffset & static_cast<uint8_t>(0x07);
 
         // Get 2-bit value - multiply tileLineIndex by two as each line is composed of 2-bytes
         const uint16_t finalAddress = tileAddress + (tileLineIndex << 1);

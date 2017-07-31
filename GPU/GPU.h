@@ -117,7 +117,7 @@ namespace Gameboy {
 
             uint32_t colors[4];
 
-            uint8_t lastWindowYPosition;
+            uint8_t windowYPosition, lastWindowYPosition;
 
             // Methods
 
