@@ -228,7 +228,9 @@ void GPU::renderScanLine() {
     const bool windowEnabled = isWindowDisplayOn()
                                && (/*gpuReg[OffWY]*/ windowYPosition <= gpuReg[OffLY])
                                && (gpuReg[OffWX] <= 166);
-    const uint8_t alteredWX = static_cast<uint8_t>(gpuReg[OffWX] >= 7 ? gpuReg[OffWX] - 7 : 0);
+
+    // TODO: Check if keeping value as unsigned becomes a problem with comparisons
+    const int16_t alteredWX = static_cast<int16_t>(gpuReg[OffWX] - 7);
 
     // Data offset for both background and window
     const uint16_t dataOffset = getBgWindowTileDataOffset();
@@ -238,6 +240,7 @@ void GPU::renderScanLine() {
     const uint16_t backgroundMapOffset = getBgTileMapOffset();
     const uint16_t windowMapOffset = getWindowTileMapOffset();
 
+    // Render Background and Window
     for (uint8_t x = 0; x < WIDTH; ++x) {
 
         // Determine whether to draw using window or background
@@ -247,10 +250,14 @@ void GPU::renderScanLine() {
         uint8_t xOffset;
         uint8_t yOffset;
 
+        // In below comparison, x and alteredWX are both promoted to 'int'
         if (windowEnabled && (x >= alteredWX) && (x <= alteredWX)) {
             // Use window
             mapOffset = windowMapOffset;
-            xOffset = x - alteredWX;
+
+            // Both values are promoted to 'int' before subtraction takes place
+            xOffset = static_cast<uint8_t>(x - alteredWX);
+
             // Handle case where window is interrupted and resumed at a later line
             // This value is updated to WY upon exiting VBLANK
             yOffset = lastWindowYPosition++;
@@ -299,6 +306,59 @@ void GPU::renderScanLine() {
 
         // Commit to frame buffer
         frameBuffer[gpuReg[OffLY] * WIDTH + x] = colors[colorIndexValue];
+    }
+
+    if (isSpriteDisplayOn()) {
+
+        /*uint8_t spritesAdded = 0;
+        struct {
+            uint8_t index;
+            int16_t x;
+        } spritesToRender[10];*/
+
+        const uint8_t spriteHeight = getSpriteHeight();
+
+        // Render Sprites (max 10 per line)
+        for (uint8_t sprite = 0; sprite < 40; ++sprite) {
+
+            // Determine the ten highest priority sprites to survive
+
+            // Check whether it is part of this scan-line
+            const int16_t spriteY1 = static_cast<int16_t>(spriteRam.readExt((sprite << 2)) - 16);
+            const int16_t spriteY2 = spriteY1 + spriteHeight;
+            if (gpuReg[OffLY] >= spriteY1 && gpuReg[OffLY] <= spriteY2) {
+
+                // Get the x-coordinates
+                const uint8_t spriteX2 = spriteRam.readExt((sprite << 2) + 1);
+                const int16_t spriteX1 = static_cast<int16_t>(spriteX2 - 8);
+
+                // Check if in screen coordinates
+                if (spriteX1 >= WIDTH || static_cast<int16_t>(spriteX2) < 0) {
+                    continue;
+                }
+
+                /*
+                // Check whether this sprite has priority over the other sprites
+                bool collision = false;
+                for (size_t i = 0; (!collision) && (i < spritesAdded); ++i) {
+                    // Check if we collide, then check if we have priority
+                    if ((spriteX1 <= spritesToRender[i].x) && (spritesToRender[i].x - spriteX1) < 8) {
+                        spritesToRender[i].x = spriteX1;
+                        spritesToRender[i].index = sprite;
+                        collision = true;
+                    }
+                }
+
+                // We did not collide, add if possible
+                if (!collision && (spritesAdded < 10)) {
+                    spritesToRender[spritesAdded].x = spriteX1;
+                    spritesToRender[spritesAdded].index = sprite;
+                    ++spritesAdded;
+                }
+                 */
+
+            }
+        }
     }
 }
 
