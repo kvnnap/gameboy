@@ -251,7 +251,7 @@ void GPU::renderScanLine() {
         uint8_t yOffset;
 
         // In below comparison, x and alteredWX are both promoted to 'int'
-        if (windowEnabled && (x >= alteredWX) && (x <= alteredWX)) {
+        if (windowEnabled && (x >= alteredWX) /*&& (x <= (alteredWX + WIDTH))*/) {
             // Use window
             mapOffset = windowMapOffset;
 
@@ -260,7 +260,7 @@ void GPU::renderScanLine() {
 
             // Handle case where window is interrupted and resumed at a later line
             // This value is updated to WY upon exiting VBLANK
-            yOffset = lastWindowYPosition++;
+            yOffset = lastWindowYPosition;
         } else if (bgEnabled) {
             // Use background
             mapOffset = backgroundMapOffset;
@@ -308,6 +308,10 @@ void GPU::renderScanLine() {
         frameBuffer[gpuReg[OffLY] * WIDTH + x] = colors[colorIndexValue];
     }
 
+    if (windowEnabled) {
+        ++lastWindowYPosition;
+    }
+
     if (isSpriteDisplayOn()) {
 
         /*uint8_t spritesAdded = 0;
@@ -325,7 +329,7 @@ void GPU::renderScanLine() {
 
             // Check whether it is part of this scan-line
             const int16_t spriteY1 = static_cast<int16_t>(spriteRam.readExt((sprite << 2)) - 16);
-            const int16_t spriteY2 = spriteY1 + spriteHeight;
+            const int16_t spriteY2 = spriteY1 + spriteHeight - 1;
             if (gpuReg[OffLY] >= spriteY1 && gpuReg[OffLY] <= spriteY2) {
 
                 // Get the x-coordinates
@@ -356,6 +360,42 @@ void GPU::renderScanLine() {
                     ++spritesAdded;
                 }
                  */
+
+                // For the time being, assume no hardware limit and no priority checks
+                // and just draw
+                // Get tile number from tile map - multiply yTileOffset by 32 as there are 32 tiles within one row
+                const uint8_t patternNumber = spriteRam.readExt((sprite << 2) + 2) & (spriteHeight == 16 ? 0xFE : 0xFF);
+                const uint8_t options = spriteRam.readExt((sprite << 2) + 3);
+                const bool hasPriority = (options & (1 << 7)) == 0;
+                const bool yFlip = (options & (1 << 6)) != 0;
+                const bool xFlip = (options & (1 << 5)) != 0;
+                const uint8_t palette = (options & (1 << 4)) != 0 ? gpuReg[OffOBP1] : gpuReg[OffOBP0];
+
+                // Select correct y-row depending on y-flip
+                const uint8_t lineNumber = static_cast<uint8_t>(yFlip ? spriteY1 - gpuReg[OffLY] : spriteY2 - gpuReg[OffLY]);
+
+                // Read the whole line
+                // Get 2-bit value - multiply tileLineIndex by two as each line is composed of 2-bytes
+                const uint16_t finalAddress = (patternNumber << 4) + (lineNumber << 1);
+
+                // render
+                for (int8_t i = 0; i < 8; ++i) {
+                    int8_t x = xFlip ? 7 - i : i;
+                    uint8_t pixelValue = static_cast<uint8_t>((videoRam.readExt(finalAddress + 1) &
+                                                               (1 << (7 - x))) ? 2 : 0);
+                    pixelValue |= (videoRam.readExt(finalAddress) >> (7 - x)) & 1;
+
+                    // Get palette colour value
+                    const uint8_t color = static_cast<uint8_t>((palette >> (pixelValue << 1)) & 0x03);
+
+                    //
+                    int16_t spriteXPixel = spriteX1 + i;
+                    if (spriteXPixel >= 0 && spriteXPixel < WIDTH
+                        && (color != colors[COLOUR0])
+                        && (hasPriority || frameBuffer[gpuReg[OffLY] * WIDTH + spriteXPixel] == colors[COLOUR0])) {
+                        frameBuffer[gpuReg[OffLY] * WIDTH + spriteXPixel] = colors[color];
+                    }
+                }
 
             }
         }
