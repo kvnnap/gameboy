@@ -39,6 +39,7 @@ namespace Gameboy {
             Registers registers;
             uint32_t ticks;
             bool interruptMasterEnable;
+            bool isHalted;
 
         private:
             // Map

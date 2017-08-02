@@ -212,18 +212,21 @@ std::uint8_t CPU::cpl_carryflag (const Instruction& instruction) {
 // special loads
 std::uint8_t CPU::ldhl_spr8 (const Instruction& instruction) {
     uint16_t srcVal = registers.read16(instruction.srcRegIndex);
-    int8_t srcValToAdd = static_cast<int8_t>(getImmediateValue());
+    uint8_t uSrcValToAdd = getImmediateValue();
+    int8_t srcValToAdd = static_cast<int8_t>(uSrcValToAdd);
     registers.write16(instruction.destRegIndex, static_cast<uint16_t>(srcVal + srcValToAdd));
 
     // Affected flags - Half Carry flag and Carry flag
     registers.reg[F] &= ~(ZeroFlag | SubtractFlag | HalfCarryFlag | CarryFlag);
-    // set if carry from bit 11 0x0FFF
-    if (0x1000 & ((srcVal & 0x0FFF) + srcValToAdd)) {
-        registers.reg[F] |=  HalfCarryFlag;
+
+    // set if carry from bit 3 to 4
+    if (0x10 & ((srcVal & 0x0F) + (uSrcValToAdd & 0x0F))) {
+        registers.reg[F] |= HalfCarryFlag;
     }
-    // set if carry from bit 15
-    if (0x10000 & (static_cast<uint32_t>(srcVal) + srcValToAdd)) {
-        registers.reg[F] |=  CarryFlag;
+
+    // set if carry from bit 7 to 8
+    if (0x100 & ((srcVal & 0xFF) + uSrcValToAdd)) {
+        registers.reg[F] |= CarryFlag;
     }
     return instruction.cycles;
 }
@@ -423,18 +426,27 @@ std::uint8_t CPU::add_reg16_to_reg16 (const Instruction& instruction) {
     return instruction.cycles;
 }
 
-// SP add
+// SP add - https://codexample.org/questions/540589/gbz80-how-does-ld-hl-sp-e-affect-h-and-c-flags.c
 std::uint8_t CPU::add_r8_to_reg16 (const Instruction& instruction) {
-    int8_t srcVal  = static_cast<int8_t>(getImmediateValue());
+    uint8_t uSrcVal = getImmediateValue();
+    int8_t srcVal  = static_cast<int8_t>(uSrcVal);
+
     uint16_t destReg = registers.read16(instruction.destRegIndex);
     registers.write16(instruction.destRegIndex, destReg + srcVal);
 
     // Affected flags - Half Carry flag and Carry flag
     registers.reg[F] &= ~(ZeroFlag | SubtractFlag | HalfCarryFlag | CarryFlag);
-    // set if carry from bit 11 0x0FFF
-    registers.reg[F] |= 0x1000 & ((destReg & 0x0FFF) + srcVal) ? HalfCarryFlag : 0;
-    // set if carry from bit 15
-    registers.reg[F] |= 0x10000 & (static_cast<uint32_t>(destReg) + srcVal) ? CarryFlag : 0;
+
+    // set if carry from bit 3 to 4
+    if (0x10 & ((destReg & 0x0F) + (uSrcVal & 0x0F))) {
+        registers.reg[F] |= HalfCarryFlag;
+    }
+
+    // set if carry from bit 7 to 8
+    if (0x100 & ((destReg & 0xFF) + uSrcVal)) {
+        registers.reg[F] |= CarryFlag;
+    }
+
     return instruction.cycles;
 }
 
@@ -500,7 +512,7 @@ std::uint8_t CPU::s_l_r_a_l_val8(std::uint8_t val) {
         }
         val >>= 1;
         // right arithmetic is same as logical but preserves MSB
-        if (!up && msbSet) {
+        if (up && msbSet) {
             val |= msbSet;
         }
     }
@@ -514,10 +526,6 @@ std::uint8_t CPU::s_l_r_a_l_val8(std::uint8_t val) {
 
 std::uint8_t CPU::stop (const Instruction& instruction) {
     throw runtime_error ("STOP instruction not yet implemented");
-}
-
-std::uint8_t CPU::halt (const Instruction& instruction) {
-    throw runtime_error ("HALT instruction not yet implemented");
 }
 
 // Jumps - relative
@@ -678,32 +686,46 @@ uint8_t CPU::call_c(const Instruction &instruction) {
 
 // DAA - TODO: Use Z80 table instead, or check with it. This is probably buggy
 // http://www.z80.info/z80syntx.htm#DAA
+// Trying this implementation
+// https://stackoverflow.com/questions/45227884/z80-daa-implementation-and-blarggs-test-rom-issues
+// https://github.com/jvaill/coffee-boy/blob/master/src/core.coffee
+// Try: https://github.com/buxxi/gameboy-emu/blob/master/gameboy-core/src/main/java/se/omfilm/gameboy/internal/instructions/arithmetic/DecimalAdjustA.java
 uint8_t CPU::daa(const Instruction &instruction) {
-
-    // Reset all affected flags and set as necessary ones
-    registers.reg[F] &= ~(ZeroFlag | HalfCarryFlag | CarryFlag);
-
-    uint8_t regValue = registers.reg[instruction.destRegIndex];
-    uint8_t low = static_cast<uint8_t>(regValue & 0x0F);
-    if ((registers.reg[F] & HalfCarryFlag) || low > 9) {
-        if (registers.reg[F] & SubtractFlag) {
-            regValue -= 0x06;
-        } else {
+    uint16_t regValue = registers.reg[instruction.destRegIndex];
+    if (registers.reg[F] & SubtractFlag)
+    {
+        // Using subtraction flags
+        if ((registers.reg[F] & HalfCarryFlag)){
+            /*regValue -= 0x06;
+            if (!(registers.reg[F] & CarryFlag)) {
+                regValue &= 0xFF;
+            }*/
+            regValue = (regValue - 6) & 0xFF;
+        }
+        if ((registers.reg[F] & CarryFlag)) {
+            regValue -= 0x60;
+        }
+    } else
+    {
+        // Using addition flags
+        if ((registers.reg[F] & HalfCarryFlag) || ((regValue & 0x0F) > 9)){
             regValue += 0x06;
         }
-    }
-    uint8_t high = static_cast<uint8_t>((regValue >> 4) & 0x0F);
-    if ((registers.reg[F] & CarryFlag) || high > 9) {
-        if (registers.reg[F] & SubtractFlag) {
-            regValue -= 0x60;
-        } else {
+        if ((registers.reg[F] & CarryFlag) || (regValue > 0x9F)) {
             regValue += 0x60;
         }
-        registers.reg[F] |= CarryFlag; // Set carry flag
     }
 
-    if (regValue == 0) {
+    // Reset all affected flags and set as necessary ones
+    registers.reg[F] &= ~(ZeroFlag | HalfCarryFlag /*| CarryFlag*/);
+
+    // Save back to register
+    registers.reg[instruction.destRegIndex] = regValue & 0xFF;
+    if (registers.reg[instruction.destRegIndex] == 0) {
         registers.reg[F] |=  ZeroFlag;
+    }
+    if (regValue & 0x100) {
+        registers.reg[F] |=  CarryFlag;
     }
     return instruction.cycles;
 }
@@ -846,128 +868,132 @@ uint8_t CPU::brancher_add_sub_and_xor_or_cp_nc_c (const Instruction& instruction
 //#include <iostream>
 void CPU::next() {
 
-    // Reset variables
-    isCurrentExtended = false;
+    if (isHalted) {
+        ticks += 4;
+    } else {
+        // Reset variables
+        isCurrentExtended = false;
 
-    // Fetch
-    currentPC = registers.read16(PC);
-    currentInstruction = mmap.read(currentPC);
-
-    // Decode Extended Instruction
-    if (currentInstruction == 0xCB) {
-        isCurrentExtended = true;
-        incrementProgramCounterBy(1);
+        // Fetch
         currentPC = registers.read16(PC);
         currentInstruction = mmap.read(currentPC);
-        incrementProgramCounterBy(1);
-    }
 
-    // Make some useful calculations
-    const uint8_t rangeNum = static_cast<uint8_t>((currentInstruction >> 6) & 0x03);
-    const uint8_t regCpuMapIndex = static_cast<uint8_t>(currentInstruction & 0x07);
-    const uint8_t regIndex = regMap[regCpuMapIndex];
-    const bool isMemoryOperation = regCpuMapIndex == 0x06;
-
-    if (!isCurrentExtended) {
-
-        splitRowSelector = static_cast<uint8_t>((currentInstruction >> 3) & 0x07);
-
-        // Execute
-        if (rangeNum == 1) { // Loads
-            // rowSelector not needed here
-            // Decode
-            const uint8_t destRegIndex = regMap[splitRowSelector];
-            const bool isDestMemoryOperation = splitRowSelector == 0x06;
-
-            // Increment Program Counter by 1 (Loads are byte long)
+        // Decode Extended Instruction
+        if (currentInstruction == 0xCB) {
+            isCurrentExtended = true;
             incrementProgramCounterBy(1);
-
-            // Further decode and execute Load
-            if (isDestMemoryOperation) {
-                if (isMemoryOperation) {
-                    // HALT - 0x76
-                    ticks += 4;
-                    throw runtime_error("HALT instruction not yet implemented");
-                } else {
-                    mmap.write(registers.read16(destRegIndex), registers.reg[regIndex]);
-                }
-            } else {
-                registers.reg[destRegIndex] = isMemoryOperation ? mmap.read(registers.read16(regIndex))
-                                                                : registers.reg[regIndex];
-            }
-
-            // ticks for loads
-            ticks += isMemoryOperation || isDestMemoryOperation ? 8 : 4;
-        } else if(rangeNum == 2) {
-            // Increment Program Counter by 1
+            currentPC = registers.read16(PC);
+            currentInstruction = mmap.read(currentPC);
             incrementProgramCounterBy(1);
-
-            // ADD, ADC, SUB, SBC, AND, XOR, OR, CP
-            const uint8_t readValue = isMemoryOperation ? mmap.read(registers.read16(regIndex))
-                                                        : registers.reg[regIndex];
-
-            add_sub_and_xor_or_cp_nc_c(readValue);
-
-            // ticks for loads
-            ticks += isMemoryOperation ? 8 : 4;
-        } else {
-            const Instruction *instruction = &instructions[currentInstruction & 0x7F];
-            incrementProgramCounterBy(instruction->length);
-            uint8_t cycles = instruction->cycles;
-            if (instruction->execfn != nullptr) {
-                cycles = (this->*instruction->execfn)(*instruction);
-            }
-            ticks += cycles;
         }
-    } else {
-        // Extended (CB) instructions - rangeNum might be more expensive
-        // Prepare variables for memory operation, read data and address
-        uint16_t address;
-        //union { // TODO: add union when not debugging
+
+        // Make some useful calculations
+        const uint8_t rangeNum = static_cast<uint8_t>((currentInstruction >> 6) & 0x03);
+        const uint8_t regCpuMapIndex = static_cast<uint8_t>(currentInstruction & 0x07);
+        const uint8_t regIndex = regMap[regCpuMapIndex];
+        const bool isMemoryOperation = regCpuMapIndex == 0x06;
+
+        if (!isCurrentExtended) {
+
+            splitRowSelector = static_cast<uint8_t>((currentInstruction >> 3) & 0x07);
+
+            // Execute
+            if (rangeNum == 1) { // Loads
+                // rowSelector not needed here
+                // Decode
+                const uint8_t destRegIndex = regMap[splitRowSelector];
+                const bool isDestMemoryOperation = splitRowSelector == 0x06;
+
+                // Increment Program Counter by 1 (Loads are byte long)
+                incrementProgramCounterBy(1);
+
+                // Further decode and execute Load
+                if (isDestMemoryOperation) {
+                    if (isMemoryOperation) {
+                        // HALT - 0x76
+                        isHalted = interruptMasterEnable;
+                        ticks += 4;
+                    } else {
+                        mmap.write(registers.read16(destRegIndex), registers.reg[regIndex]);
+                    }
+                } else {
+                    registers.reg[destRegIndex] = isMemoryOperation ? mmap.read(registers.read16(regIndex))
+                                                                    : registers.reg[regIndex];
+                }
+
+                // ticks for loads
+                ticks += isMemoryOperation || isDestMemoryOperation ? 8 : 4;
+            } else if (rangeNum == 2) {
+                // Increment Program Counter by 1
+                incrementProgramCounterBy(1);
+
+                // ADD, ADC, SUB, SBC, AND, XOR, OR, CP
+                const uint8_t readValue = isMemoryOperation ? mmap.read(registers.read16(regIndex))
+                                                            : registers.reg[regIndex];
+
+                add_sub_and_xor_or_cp_nc_c(readValue);
+
+                // ticks for loads
+                ticks += isMemoryOperation ? 8 : 4;
+            } else {
+                const Instruction *instruction = &instructions[currentInstruction & 0x7F];
+                incrementProgramCounterBy(instruction->length);
+                uint8_t cycles = instruction->cycles;
+                if (instruction->execfn != nullptr) {
+                    cycles = (this->*instruction->execfn)(*instruction);
+                }
+                ticks += cycles;
+            }
+        } else {
+            // Extended (CB) instructions - rangeNum might be more expensive
+            // Prepare variables for memory operation, read data and address
+            uint16_t address;
+            //union { // TODO: add union when not debugging
             uint8_t readValue;
             uint8_t writeValue;
-        //};
+            //};
 
-        if (isMemoryOperation) {
-            address = registers.read16(regIndex);
-            readValue = mmap.read(address);
-        } else {
-            readValue = registers.reg[regIndex];
-        }
-
-        // Calculate operation
-        if (rangeNum == 0) {
-            if (currentInstruction & 0x20) {
-                // 0x20 - 0x3F - shift left, right, right logical, swap
-                writeValue = s_l_r_a_l_val8(readValue);
-            } else {
-                // 0x00 - 0x1F - Rotates
-                writeValue = r_l_r_c_val8(readValue);
-            }
-        } else {
-            const uint8_t bitNumFlag = static_cast<uint8_t>(1 << ((currentInstruction >> 3) & 0x07));
-            if (rangeNum == 1) { // BIT instructions
-                // Reset flags
-                registers.reg[F] &= ~(ZeroFlag | SubtractFlag);
-                registers.reg[F] |= HalfCarryFlag;
-                if ((readValue & bitNumFlag) == 0) {
-                    registers.reg[F] |= ZeroFlag;
-                }
-            } else { // RES and SET instructions
-                writeValue = rangeNum == 2 ? readValue & ~bitNumFlag : readValue | bitNumFlag;
-            }
-        }
-
-        // Write value if necessary
-        if (rangeNum != 1) {
             if (isMemoryOperation) {
-                mmap.write(address, writeValue);
+                address = registers.read16(regIndex);
+                readValue = mmap.read(address);
             } else {
-                registers.reg[regIndex] = writeValue;
+                readValue = registers.reg[regIndex];
             }
-        }
 
-        ticks += isMemoryOperation ? 16 : 8;
+            // Calculate operation
+            if (rangeNum == 0) {
+                if (currentInstruction & 0x20) {
+                    // 0x20 - 0x3F - shift left, right, right logical, swap
+                    writeValue = s_l_r_a_l_val8(readValue);
+                } else {
+                    // 0x00 - 0x1F - Rotates
+                    writeValue = r_l_r_c_val8(readValue);
+                }
+            } else {
+                const uint8_t bitNumFlag = static_cast<uint8_t>(1 << ((currentInstruction >> 3) & 0x07));
+                if (rangeNum == 1) { // BIT instructions
+                    // Reset flags
+                    registers.reg[F] &= ~(ZeroFlag | SubtractFlag);
+                    registers.reg[F] |= HalfCarryFlag;
+                    if ((readValue & bitNumFlag) == 0) {
+                        registers.reg[F] |= ZeroFlag;
+                    }
+                } else { // RES and SET instructions
+                    writeValue = rangeNum == 2 ? readValue & ~bitNumFlag : readValue | bitNumFlag;
+                }
+            }
+
+            // Write value if necessary
+            if (rangeNum != 1) {
+                if (isMemoryOperation) {
+                    mmap.write(address, writeValue);
+                } else {
+                    registers.reg[regIndex] = writeValue;
+                }
+            }
+
+            ticks += isMemoryOperation ? 16 : 8;
+        }
     }
 
     // Check interrupts
@@ -982,6 +1008,9 @@ void CPU::next() {
                 for (size_t i = 0; i < 5; ++i) {
                     const std::uint8_t bitFlag = static_cast<uint8_t>(1 << i);
                     if ((ier & bitFlag) && (ifr & bitFlag)) {
+                        // Restore from halt if was halted
+                        isHalted = false;
+
                         // handle interrupt i, reset IF flag
                         mmap.write(0xFF0F, static_cast<uint8_t>(ifr & ~bitFlag));
                         interruptMasterEnable = false;

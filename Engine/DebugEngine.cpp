@@ -12,6 +12,7 @@
 #include "CPU/DebugInstruction.h"
 #include "General/StringOperations.h"
 
+#include <iomanip>
 #include <iostream>
 #include <sstream>
 
@@ -49,7 +50,7 @@ void DebugEngine::start(const string &cartridgeFileName) {
         while (running) {
 
             if (needToBreak(cpu)) {
-                running = processInput(cpu);
+                running = processInput(cpu, mmap);
                 if (!running) {
                     continue;
                 }
@@ -74,12 +75,14 @@ void DebugEngine::start(const string &cartridgeFileName) {
     }
 }
 
-bool DebugEngine::processInput(CPU::ICPU& cpu) {
+bool DebugEngine::processInput(CPU::ICPU& cpu, Memory::MemoryMappedIO& mmap) {
     using namespace Gameboy::CPU;
 
     Registers& registers = cpu.getRegisters();
     cout << registers.toString() << endl;
-    cout << "EI: " << (cpu.isInterruptMasterEnabled() ? "1" : "0") << endl;
+    cout << "EI: " << (cpu.isInterruptMasterEnabled() ? "1" : "0")
+         << " IE: " << hex << setw(2) << static_cast<uint16_t>(mmap.read(0xFFFF))
+         << " IF: " << hex << setw(2) << static_cast<uint16_t>(mmap.read(0xFF0F)) << endl;
 
     vector<DebugInstruction> debugInstructions = cpu.disassemble(3);
     for (const DebugInstruction& dbgInstr : debugInstructions) {

@@ -45,7 +45,8 @@ Registers::Registers()
 {}
 
 void Registers::write16(uint8_t destIndex, uint16_t value) {
-    reg[destIndex] = static_cast<uint8_t>(value);
+    // lower 4 bits are unused in F register
+    reg[destIndex] = static_cast<uint8_t>(destIndex == AF ? (value & 0xF0) : value);
     reg[destIndex + 1] = static_cast<uint8_t>(value >> 8);
 }
 

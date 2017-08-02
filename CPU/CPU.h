@@ -115,8 +115,6 @@ namespace Gameboy {
 
             uint8_t cpl_carryflag(const Instruction &instruction);
 
-            uint8_t halt(const Instruction &instruction);
-
             uint8_t ret(const Instruction &instruction);
 
             uint8_t reti(const Instruction &instruction);

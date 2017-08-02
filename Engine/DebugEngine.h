@@ -8,6 +8,7 @@
 #include <set>
 #include "Engine/IEngine.h"
 #include "CPU/ICPU.h"
+#include "Memory/MemoryMappedIO.h"
 
 namespace Gameboy {
     namespace Engine {
@@ -23,7 +24,7 @@ namespace Gameboy {
         private:
             bool needToBreak(CPU::ICPU& cpu);
 
-            bool processInput(CPU::ICPU& cpu);
+            bool processInput(CPU::ICPU& cpu, Memory::MemoryMappedIO& mmap);
 
             std::set<uint16_t> breakpoints;
             bool step;

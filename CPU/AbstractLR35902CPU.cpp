@@ -158,7 +158,8 @@ AbstractLR35902CPU::~AbstractLR35902CPU()
 AbstractLR35902CPU::AbstractLR35902CPU(Memory::MemoryMappedIO& p_mmap)
     : mmap (p_mmap),
       ticks (),
-      interruptMasterEnable ()
+      interruptMasterEnable (),
+      isHalted ()
 {}
 
 const uint8_t Gameboy::CPU::AbstractLR35902CPU::regMap[8] = {B, C, D, E, H, L, HL, A};
@@ -211,7 +212,7 @@ DebugInstruction AbstractLR35902CPU::fetchAndDecode(uint16_t pc) const {
                 // HALT
                 // debugInstruction.Ticks = 4;
                 strInstruction = "HALT";
-
+                std::snprintf(buff, sizeof(buff), strInstruction.c_str());
             } else {
                 // debugInstruction.Ticks = static_cast<uint8_t>(isMemoryOperation ? 8 : 4);
                 strInstruction = "LD";
