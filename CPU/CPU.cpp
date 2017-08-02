@@ -213,6 +213,7 @@ std::uint8_t CPU::cpl_carryflag (const Instruction& instruction) {
 std::uint8_t CPU::ldhl_spr8 (const Instruction& instruction) {
     uint16_t srcVal = registers.read16(instruction.srcRegIndex);
     int8_t srcValToAdd = static_cast<int8_t>(getImmediateValue());
+    registers.write16(instruction.destRegIndex, static_cast<uint16_t>(srcVal + srcValToAdd));
 
     // Affected flags - Half Carry flag and Carry flag
     registers.reg[F] &= ~(ZeroFlag | SubtractFlag | HalfCarryFlag | CarryFlag);
