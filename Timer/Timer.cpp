@@ -36,15 +36,16 @@ bool Timer::next(uint32_t ticks) {
     // Handle Div Register
     divClock += ticks;
     if (divClock >= ticksForSpeed[3]) {
-        divClock = 0;
+        divClock -= ticksForSpeed[3];
         ++timerReg[OffDIV];
     }
 
     // Handle Timer Register
     if (isTimerEnabled()) {
         timerClock += ticks;
-        if (timerClock >= ticksForSpeed[getTimerSpeed()]) {
-            timerClock = 0;
+        uint16_t ticksFS = ticksForSpeed[getTimerSpeed()];
+        if (timerClock >= ticksFS) {
+            timerClock -= ticksFS;
             if (++timerReg[OffTIMA] == 0) {
                 // overflow - Load Module Value
                 timerReg[OffTIMA] = timerReg[OffTMA];
@@ -72,7 +73,7 @@ void Timer::write(uint16_t address, uint8_t datum) {
         switch (offset) {
             case OffDIV:
                 timerReg[offset] = 0;
-                // divClock = 0; // Not sure about this, but I don't think so
+                divClock = 0; // Not sure about this, but I don't think so
                 break;
             case OffTIMA:
             case OffTMA:
@@ -80,6 +81,7 @@ void Timer::write(uint16_t address, uint8_t datum) {
                 break;
             case OffTAC:
                 timerReg[offset] = datum; //static_cast<uint8_t>(datum & 0x07);
+                timerClock = 0;
                 if (datum > 7) {
                     throw runtime_error ("Writing value: " + to_string(datum) + " to Timer Control Register");
                 }
