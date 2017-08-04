@@ -59,7 +59,9 @@ void DebugEngine::start(const string &cartridgeFileName) {
             clock = cpu.getTicks();
             cpu.next();
             duration = cpu.getTicks() - clock;
-            gpu.next(duration);
+            if (gpu.next(duration)) {
+                joypad.processInput();
+            }
             timer.next(duration);
         }
     } catch (...) {

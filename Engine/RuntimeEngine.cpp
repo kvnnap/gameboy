@@ -50,11 +50,11 @@ void RuntimeEngine::start(const string& cartridgeFileName) {
     uint32_t duration;
     while (true) {
         clock = cpu.getTicks();
-        //cout << cpu.disassembleNext().toString() << endl;
         cpu.next();
         duration = cpu.getTicks() - clock;
-        //cout << "clock: " << clock << " duration: " << duration << endl;
-        gpu.next(duration);
+        if (gpu.next(duration)) {
+            joypad.processInput();
+        }
         timer.next(duration);
     }
 }

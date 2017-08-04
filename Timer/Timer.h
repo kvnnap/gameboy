@@ -41,7 +41,7 @@ namespace Gameboy {
             std::uint8_t read(std::uint16_t address) const override;
             void write(std::uint16_t address, std::uint8_t datum) override;
 
-            void next(std::uint32_t ticks) override;
+            bool next(std::uint32_t ticks) override;
         private:
             static const uint16_t ticksForSpeed[4];
             CPU::IInterruptible & interruptible;

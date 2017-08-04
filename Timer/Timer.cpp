@@ -32,7 +32,7 @@ bool Timer::isTimerEnabled() {
     return (timerReg[OffTAC] & (1 << 2)) != 0;
 }
 
-void Timer::next(uint32_t ticks) {
+bool Timer::next(uint32_t ticks) {
     // Handle Div Register
     divClock += ticks;
     if (divClock >= ticksForSpeed[3]) {
@@ -55,6 +55,8 @@ void Timer::next(uint32_t ticks) {
     } /*else {
         timerClock = 0; // Not sure about this, but I don't think so
     }*/
+
+    return true;
 }
 
 uint8_t Timer::read(uint16_t address) const {

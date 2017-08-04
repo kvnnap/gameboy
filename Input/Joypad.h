@@ -29,9 +29,19 @@ namespace Gameboy {
             std::uint8_t read(std::uint16_t address) const override;
             void write(std::uint16_t address, std::uint8_t datum) override;
 
+            void processInput();
+
         private:
             CPU::IInterruptible& interruptible;
+
+            // As expected by joypad register
             std::uint8_t inputRegister;
+
+            // Keymap by INPUT Library
+            std::uint8_t keyPressMap;
+
+            // methods
+            void updateInputRegister();
         };
     }
 }

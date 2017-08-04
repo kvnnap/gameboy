@@ -11,7 +11,7 @@ namespace Gameboy {
         public:
             virtual ~ITick(){};
 
-            virtual void next(std::uint32_t ticks) = 0;
+            virtual bool next(std::uint32_t ticks) = 0;
         };
     }
 }

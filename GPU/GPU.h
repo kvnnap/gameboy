@@ -95,7 +95,7 @@ namespace Gameboy {
                 General::IReadable& readableMemoryMappedIO,
                 IVideoOutputDevice& p_outputDevice);
 
-            void next(std::uint32_t ticks) override;
+            bool next(std::uint32_t ticks) override;
 
             std::uint8_t read(std::uint16_t address) const override;
             void write(std::uint16_t address, std::uint8_t datum) override;

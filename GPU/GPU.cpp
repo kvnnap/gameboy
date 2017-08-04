@@ -25,9 +25,9 @@ GPU::GPU(Gameboy::CPU::IInterruptible &p_interruptible, IReadable& p_readableMem
     spriteRam.initialise(Memory::MemoryType(160));
 }
 
-void GPU::next(uint32_t ticks) {
+bool GPU::next(uint32_t ticks) {
     if (!isLcdOn()) {
-        return;
+        return false;
     }
     clock += ticks;
     Mode mode = getMode();
@@ -40,6 +40,7 @@ void GPU::next(uint32_t ticks) {
                 if (gpuReg[OffLY] == HEIGHT) {
                     outputDevice.render(frameBuffer.data());
                     setMode(VBlank);
+                    return true;
                     // Frame is ready, commit it
                 } else {
                     setMode(OAMUsed);
@@ -74,6 +75,8 @@ void GPU::next(uint32_t ticks) {
             }
             break;
     }
+
+    return false;
 }
 
 // LCDC
