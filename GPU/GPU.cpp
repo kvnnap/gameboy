@@ -205,7 +205,7 @@ void GPU::write(uint16_t address, uint8_t datum) {
                 for (uint8_t i = 0; i < (UnusableIO1 - SpriteRam); ++i) {
                     //write(SpriteRam + i, readableMemoryMappedIO.read(baseAddress + i));
                     // Rough implementation, need to emulate more
-                    // TODO: This takes 671 ticks, data wriging should be probably emulated
+                    // TODO: This takes 671 ticks, data writing should be probably emulated
                     // during this course of time. Or at the very least, lock the whole memory map
                     // except High Ram.
                     spriteRam.writeExt(i, readableMemoryMappedIO.read(baseAddress + i));
@@ -333,73 +333,73 @@ void GPU::renderScanLine() {
             // Check whether it is part of this scan-line
             const int16_t spriteY1 = static_cast<int16_t>(spriteRam.readExt((sprite << 2)) - 16);
             const int16_t spriteY2 = spriteY1 + spriteHeight - 1;
-            if (gpuReg[OffLY] >= spriteY1 && gpuReg[OffLY] <= spriteY2) {
+            if (gpuReg[OffLY] < spriteY1 || gpuReg[OffLY] > spriteY2) {
+                continue;
+            }
 
-                // Get the x-coordinates
-                const uint8_t spriteX2 = spriteRam.readExt((sprite << 2) + 1);
-                const int16_t spriteX1 = static_cast<int16_t>(spriteX2 - 8);
+            // Get the x-coordinates
+            const uint8_t spriteX2 = spriteRam.readExt((sprite << 2) + 1);
+            const int16_t spriteX1 = static_cast<int16_t>(spriteX2 - 8);
 
-                // Check if in screen coordinates
-                if (spriteX1 >= WIDTH || static_cast<int16_t>(spriteX2) < 0) {
-                    continue;
+            // Check if in screen coordinates
+            if (spriteX1 >= WIDTH || static_cast<int16_t>(spriteX2) < 0) {
+                continue;
+            }
+
+            /*
+            // Check whether this sprite has priority over the other sprites
+            bool collision = false;
+            for (size_t i = 0; (!collision) && (i < spritesAdded); ++i) {
+                // Check if we collide, then check if we have priority
+                if ((spriteX1 <= spritesToRender[i].x) && (spritesToRender[i].x - spriteX1) < 8) {
+                    spritesToRender[i].x = spriteX1;
+                    spritesToRender[i].index = sprite;
+                    collision = true;
                 }
+            }
 
-                /*
-                // Check whether this sprite has priority over the other sprites
-                bool collision = false;
-                for (size_t i = 0; (!collision) && (i < spritesAdded); ++i) {
-                    // Check if we collide, then check if we have priority
-                    if ((spriteX1 <= spritesToRender[i].x) && (spritesToRender[i].x - spriteX1) < 8) {
-                        spritesToRender[i].x = spriteX1;
-                        spritesToRender[i].index = sprite;
-                        collision = true;
-                    }
+            // We did not collide, add if possible
+            if (!collision && (spritesAdded < 10)) {
+                spritesToRender[spritesAdded].x = spriteX1;
+                spritesToRender[spritesAdded].index = sprite;
+                ++spritesAdded;
+            }
+             */
+
+            // For the time being, assume no hardware limit and no priority checks
+            // and just draw
+            // Get tile number from tile map - multiply yTileOffset by 32 as there are 32 tiles within one row
+            const uint8_t patternNumber = spriteRam.readExt((sprite << 2) + 2) & (spriteHeight == 16 ? 0xFE : 0xFF);
+            const uint8_t options = spriteRam.readExt((sprite << 2) + 3);
+            const bool hasPriority = (options & (1 << 7)) == 0;
+            const bool yFlip = (options & (1 << 6)) != 0;
+            const bool xFlip = (options & (1 << 5)) != 0;
+            const uint8_t palette = (options & (1 << 4)) != 0 ? gpuReg[OffOBP1] : gpuReg[OffOBP0];
+
+            // Select correct y-row depending on y-flip
+            const uint8_t lineNumber = static_cast<uint8_t>(yFlip ? spriteY2 - gpuReg[OffLY] : gpuReg[OffLY] - spriteY1);
+
+            // Read the whole line
+            // Get 2-bit value - multiply tileLineIndex by two as each line is composed of 2-bytes
+            const uint16_t finalAddress = (patternNumber << 4) + (lineNumber << 1);
+
+            // render
+            for (int8_t i = 0; i < 8; ++i) {
+                int8_t x = xFlip ? 7 - i : i;
+                uint8_t pixelValue = static_cast<uint8_t>((videoRam.readExt(finalAddress + 1) &
+                                                           (1 << (7 - x))) ? 2 : 0);
+                pixelValue |= (videoRam.readExt(finalAddress) >> (7 - x)) & 1;
+
+                // Get palette colour value
+                const uint8_t color = static_cast<uint8_t>((palette >> (pixelValue << 1)) & 0x03);
+
+                //
+                const int16_t spriteXPixel = spriteX1 + i;
+                if (spriteXPixel >= 0 && spriteXPixel < WIDTH
+                    && (color != colors[COLOUR0])
+                    && (hasPriority || frameBuffer[gpuReg[OffLY] * WIDTH + spriteXPixel] == colors[COLOUR0])) {
+                    frameBuffer[gpuReg[OffLY] * WIDTH + spriteXPixel] = colors[color];
                 }
-
-                // We did not collide, add if possible
-                if (!collision && (spritesAdded < 10)) {
-                    spritesToRender[spritesAdded].x = spriteX1;
-                    spritesToRender[spritesAdded].index = sprite;
-                    ++spritesAdded;
-                }
-                 */
-
-                // For the time being, assume no hardware limit and no priority checks
-                // and just draw
-                // Get tile number from tile map - multiply yTileOffset by 32 as there are 32 tiles within one row
-                const uint8_t patternNumber = spriteRam.readExt((sprite << 2) + 2) & (spriteHeight == 16 ? 0xFE : 0xFF);
-                const uint8_t options = spriteRam.readExt((sprite << 2) + 3);
-                const bool hasPriority = (options & (1 << 7)) == 0;
-                const bool yFlip = (options & (1 << 6)) != 0;
-                const bool xFlip = (options & (1 << 5)) != 0;
-                const uint8_t palette = (options & (1 << 4)) != 0 ? gpuReg[OffOBP1] : gpuReg[OffOBP0];
-
-                // Select correct y-row depending on y-flip
-                const uint8_t lineNumber = static_cast<uint8_t>(yFlip ? spriteY1 - gpuReg[OffLY] : spriteY2 - gpuReg[OffLY]);
-
-                // Read the whole line
-                // Get 2-bit value - multiply tileLineIndex by two as each line is composed of 2-bytes
-                const uint16_t finalAddress = (patternNumber << 4) + (lineNumber << 1);
-
-                // render
-                for (int8_t i = 0; i < 8; ++i) {
-                    int8_t x = xFlip ? 7 - i : i;
-                    uint8_t pixelValue = static_cast<uint8_t>((videoRam.readExt(finalAddress + 1) &
-                                                               (1 << (7 - x))) ? 2 : 0);
-                    pixelValue |= (videoRam.readExt(finalAddress) >> (7 - x)) & 1;
-
-                    // Get palette colour value
-                    const uint8_t color = static_cast<uint8_t>((palette >> (pixelValue << 1)) & 0x03);
-
-                    //
-                    int16_t spriteXPixel = spriteX1 + i;
-                    if (spriteXPixel >= 0 && spriteXPixel < WIDTH
-                        && (color != colors[COLOUR0])
-                        && (hasPriority || frameBuffer[gpuReg[OffLY] * WIDTH + spriteXPixel] == colors[COLOUR0])) {
-                        frameBuffer[gpuReg[OffLY] * WIDTH + spriteXPixel] = colors[color];
-                    }
-                }
-
             }
         }
     }
