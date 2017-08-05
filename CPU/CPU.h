@@ -35,6 +35,7 @@ namespace Gameboy {
             uint8_t currentInstruction;
             bool isCurrentExtended;
             uint8_t splitRowSelector; // 3-bit row divided by two selector
+            bool delayedIMEFlag;
 
             // Utils
             void incrementProgramCounterBy(std::uint16_t incrementAmount);

@@ -155,7 +155,8 @@ const Instruction Gameboy::CPU::CPU::instructions[128] = {
 
 CPU::CPU(Memory::MemoryMappedIO& p_mmap)
     : AbstractLR35902CPU (p_mmap),
-      currentPC ()
+      currentPC (),
+      delayedIMEFlag ()
 {}
 
 // Utils
@@ -178,6 +179,7 @@ bool CPU::getShouldJump(bool notZeroOrNotCarry, uint8_t flag) const {
 //interrupts
 std::uint8_t CPU::enable_interrupts (const Instruction& instruction) {
     interruptMasterEnable = true;
+    delayedIMEFlag = true;
     return instruction.cycles;
 }
 
@@ -999,35 +1001,40 @@ void CPU::next() {
 
     // Check interrupts
     if (interruptMasterEnable) {
-        // Read interrupt enable register
-        uint8_t ier = mmap.read(0xFFFF);
-        uint8_t ifr;
-        if (ier != 0) {
-            ifr = mmap.read(0xFF0F);
-            if (ifr != 0) {
-                // Some interrupt was raised, handle the interrupt
-                for (size_t i = 0; i < 5; ++i) {
-                    const std::uint8_t bitFlag = static_cast<uint8_t>(1 << i);
-                    if ((ier & bitFlag) && (ifr & bitFlag)) {
-                        // Restore from halt if was halted
-                        isHalted = false;
 
-                        // handle interrupt i, reset IF flag
-                        mmap.write(0xFF0F, static_cast<uint8_t>(ifr & ~bitFlag));
-                        interruptMasterEnable = false;
-                        // Read stack pointer
-                        uint16_t stackPointer = registers.read16(SP);
-                        // Copy to stack
-                        mmap.write16(stackPointer -= 2, registers.read16(PC));
-                        // decrement stack pointer
-                        registers.write16(SP, stackPointer);
-                        // jump to address
-                        registers.write16(PC, static_cast<uint16_t>(0x0040 | (i << 3)));
-                        // Some time must have passed - undocumented
-                        // https://github.com/sinamas/gambatte/blob/master/libgambatte/src/interrupter.cpp
-                        // probably 20 cycles or 24?
-                        ticks += 20;
-                        break;
+        if (delayedIMEFlag) {
+            delayedIMEFlag = false;
+        } else {
+            // Read interrupt enable register
+            uint8_t ier = mmap.read(0xFFFF);
+            uint8_t ifr;
+            if (ier != 0) {
+                ifr = mmap.read(0xFF0F);
+                if (ifr != 0) {
+                    // Some interrupt was raised, handle the interrupt
+                    for (size_t i = 0; i < 5; ++i) {
+                        const std::uint8_t bitFlag = static_cast<uint8_t>(1 << i);
+                        if ((ier & bitFlag) && (ifr & bitFlag)) {
+                            // Restore from halt if was halted
+                            isHalted = false;
+
+                            // handle interrupt i, reset IF flag
+                            mmap.write(0xFF0F, static_cast<uint8_t>(ifr & ~bitFlag));
+                            interruptMasterEnable = false;
+                            // Read stack pointer
+                            uint16_t stackPointer = registers.read16(SP);
+                            // Copy to stack
+                            mmap.write16(stackPointer -= 2, registers.read16(PC));
+                            // decrement stack pointer
+                            registers.write16(SP, stackPointer);
+                            // jump to address
+                            registers.write16(PC, static_cast<uint16_t>(0x0040 | (i << 3)));
+                            // Some time must have passed - undocumented
+                            // https://github.com/sinamas/gambatte/blob/master/libgambatte/src/interrupter.cpp
+                            // probably 20 cycles or 24?
+                            ticks += 20;
+                            break;
+                        }
                     }
                 }
             }
