@@ -100,8 +100,6 @@ namespace Gameboy {
             std::uint8_t read(std::uint16_t address) const override;
             void write(std::uint16_t address, std::uint8_t datum) override;
 
-
-
         private:
             CPU::IInterruptible& interruptible;
             General::IReadable& readableMemoryMappedIO; // Used for DMA
@@ -127,7 +125,7 @@ namespace Gameboy {
                 std::uint8_t gpuReg[12];
             };
 
-            uint32_t colors[4];
+            static const uint32_t colors[4];
 
             uint8_t windowYPosition, lastWindowYPosition;
 

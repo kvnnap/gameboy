@@ -3,11 +3,14 @@
 //
 
 #include <stdexcept>
+#include <algorithm>
 #include "GPU/GPU.h"
 
 using namespace std;
 using namespace Gameboy::GPU;
 using namespace Gameboy::General;
+
+const uint32_t GPU::colors[4] = {COLOUR0, COLOUR1, COLOUR2, COLOUR3};
 
 GPU::GPU(Gameboy::CPU::IInterruptible &p_interruptible, IReadable& p_readableMemoryMappedIO, IVideoOutputDevice& p_outputDevice)
     : interruptible (p_interruptible),
@@ -16,7 +19,6 @@ GPU::GPU(Gameboy::CPU::IInterruptible &p_interruptible, IReadable& p_readableMem
       frameBuffer (WIDTH * HEIGHT),
       clock (),
       gpuReg (),
-      colors {COLOUR0, COLOUR1, COLOUR2, COLOUR3},
       windowYPosition (),
       lastWindowYPosition ()
 {
@@ -317,19 +319,17 @@ void GPU::renderScanLine() {
 
     if (isSpriteDisplayOn()) {
 
-        /*uint8_t spritesAdded = 0;
-        struct {
+        struct STR {
             uint8_t index;
-            int16_t x;
-        } spritesToRender[10];*/
+            uint8_t x;
+        } spritesToRender[10];
+
+        uint8_t spritesToRenderCount = 0;
 
         const uint8_t spriteHeight = getSpriteHeight();
 
-        // Render Sprites (max 10 per line)
-        for (uint8_t sprite = 0; sprite < 40; ++sprite) {
-
-            // Determine the ten highest priority sprites to survive
-
+        // Sprite Priority Order
+        for (uint8_t sprite = 0; spritesToRenderCount < 10 && sprite < 40; ++sprite) {
             // Check whether it is part of this scan-line
             const int16_t spriteY1 = static_cast<int16_t>(spriteRam.readExt((sprite << 2)) - 16);
             const int16_t spriteY2 = spriteY1 + spriteHeight - 1;
@@ -346,28 +346,43 @@ void GPU::renderScanLine() {
                 continue;
             }
 
-            /*
-            // Check whether this sprite has priority over the other sprites
-            bool collision = false;
-            for (size_t i = 0; (!collision) && (i < spritesAdded); ++i) {
-                // Check if we collide, then check if we have priority
-                if ((spriteX1 <= spritesToRender[i].x) && (spritesToRender[i].x - spriteX1) < 8) {
-                    spritesToRender[i].x = spriteX1;
-                    spritesToRender[i].index = sprite;
-                    collision = true;
-                }
+            spritesToRender[spritesToRenderCount].index = sprite;
+            spritesToRender[spritesToRenderCount].x = spriteX2;
+            ++spritesToRenderCount;
+        }
+
+        // Sort by x-descending - stable sort will preserve the sprite index order
+        stable_sort(spritesToRender,
+                    spritesToRender + spritesToRenderCount,
+                    [](const STR& str1, const STR& str2) -> bool {
+                        return str1.x > str2.x;
+                    }
+        );
+
+        // Draw
+
+        // Render Sprites (max 10 per line)
+        for (uint8_t s = 0; s < spritesToRenderCount; ++s) {
+
+            // check if next coordinate is the same, if so, take the last one
+            uint8_t x = spritesToRender[s].x;
+            uint8_t sprite = spritesToRender[s].index;
+
+            // Skip x coordinates that are the same
+            while (((s + 1) < spritesToRenderCount) && spritesToRender[s + 1].x == x) {
+                ++s;
             }
 
-            // We did not collide, add if possible
-            if (!collision && (spritesAdded < 10)) {
-                spritesToRender[spritesAdded].x = spriteX1;
-                spritesToRender[spritesAdded].index = sprite;
-                ++spritesAdded;
-            }
-             */
+            // Determine the ten highest priority sprites to survive
 
-            // For the time being, assume no hardware limit and no priority checks
-            // and just draw
+            // Check whether it is part of this scan-line
+            const int16_t spriteY1 = static_cast<int16_t>(spriteRam.readExt((sprite << 2)) - 16);
+            const int16_t spriteY2 = spriteY1 + spriteHeight - 1;
+
+            // Get the x-coordinates
+            const uint8_t spriteX2 = spriteRam.readExt((sprite << 2) + 1);
+            const int16_t spriteX1 = static_cast<int16_t>(spriteX2 - 8);
+
             // Get tile number from tile map - multiply yTileOffset by 32 as there are 32 tiles within one row
             const uint8_t patternNumber = spriteRam.readExt((sprite << 2) + 2) & (spriteHeight == 16 ? 0xFE : 0xFF);
             const uint8_t options = spriteRam.readExt((sprite << 2) + 3);
@@ -390,19 +405,19 @@ void GPU::renderScanLine() {
                                                            (1 << (7 - x))) ? 2 : 0);
                 pixelValue |= (videoRam.readExt(finalAddress) >> (7 - x)) & 1;
 
-                // Get palette colour value
-                const uint8_t color = static_cast<uint8_t>((palette >> (pixelValue << 1)) & 0x03);
+                // Get palette colour value - if zero, use transparent (white, colour 0)
+                // https://github.com/Dooskington/GameLad/wiki/Part-12---GPU
+                const uint8_t colorPaletteIndex = static_cast<uint8_t>(pixelValue == 0 ? 0 : (palette >> (pixelValue << 1)) & 0x03);
+                const uint32_t color = colors[colorPaletteIndex];
 
                 //
                 const int16_t spriteXPixel = spriteX1 + i;
                 if (spriteXPixel >= 0 && spriteXPixel < WIDTH
-                    && (color != colors[COLOUR0])
-                    && (hasPriority || frameBuffer[gpuReg[OffLY] * WIDTH + spriteXPixel] == colors[COLOUR0])) {
-                    frameBuffer[gpuReg[OffLY] * WIDTH + spriteXPixel] = colors[color];
+                    && (color != COLOUR0)
+                    && (hasPriority || frameBuffer[gpuReg[OffLY] * WIDTH + spriteXPixel] == COLOUR0)) {
+                    frameBuffer[gpuReg[OffLY] * WIDTH + spriteXPixel] = color;
                 }
             }
         }
     }
 }
-
-
