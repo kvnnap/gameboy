@@ -44,7 +44,7 @@ bool Timer::next(uint32_t ticks) {
     if (isTimerEnabled()) {
         timerClock += ticks;
         uint16_t ticksFS = ticksForSpeed[getTimerSpeed()];
-        if (timerClock >= ticksFS) {
+        while (timerClock >= ticksFS) {
             timerClock -= ticksFS;
             if (++timerReg[OffTIMA] == 0) {
                 // overflow - Load Module Value
@@ -74,6 +74,7 @@ void Timer::write(uint16_t address, uint8_t datum) {
             case OffDIV:
                 timerReg[offset] = 0;
                 divClock = 0; // Not sure about this, but I don't think so
+                timerClock = 0; // Resetting
                 break;
             case OffTIMA:
             case OffTMA:

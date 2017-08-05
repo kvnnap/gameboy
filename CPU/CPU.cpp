@@ -992,7 +992,8 @@ void CPU::next() {
                 }
             }
 
-            ticks += isMemoryOperation ? 16 : 8;
+            // Bit memory instructions take 12 clock cycles
+            ticks += isMemoryOperation ? (rangeNum == 1 ? 12 : 16) : 8;
         }
     }
 
