@@ -32,11 +32,18 @@ void Joypad::write(uint16_t address, uint8_t datum) {
     }
 }
 
-void Joypad::processInput() {
+bool Joypad::processInput() {
     uint8_t tempRegister = keyPressMap;
 
     SDL_Event e;
     while (SDL_PollEvent( &e ) != 0) {
+
+        // Check if user is quitting
+        if (e.type == SDL_QUIT) {
+            return false;
+        }
+
+        // Process keys
         if (e.type == SDL_KEYDOWN || e.type == SDL_KEYUP) {
 
             // Determine key-up or key-down
@@ -66,8 +73,6 @@ void Joypad::processInput() {
         }
     }
 
-
-
     // Check if something changed
     if ((keyPressMap ^ tempRegister) != 0) {
         // Raise interrupt
@@ -77,6 +82,9 @@ void Joypad::processInput() {
     // Update key values
     keyPressMap = tempRegister;
     updateInputRegister();
+
+    // Continue
+    return true;
 }
 
 void Joypad::updateInputRegister() {
