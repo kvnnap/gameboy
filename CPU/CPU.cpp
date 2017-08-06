@@ -362,7 +362,7 @@ std::uint8_t CPU::inc_regpt (const Instruction& instruction) {
     // Affects Zero flag, Subtract flag and Half Carry flag
     uint16_t memLocation = registers.read16(instruction.srcRegIndex);
     uint8_t memValueAfter = mmap.read(memLocation);
-    mmap.write16(memLocation, ++memValueAfter);
+    mmap.write(memLocation, ++memValueAfter);
 
     // Reset all affected flags and set necessary ones
     incdec8_flags(memValueAfter, false);
@@ -383,7 +383,7 @@ std::uint8_t CPU::dec_regpt (const Instruction& instruction) {
     // Affects Zero flag, Subtract flag and Half Carry flag
     uint16_t memLocation = registers.read16(instruction.srcRegIndex);
     uint8_t memValueAfter = mmap.read(memLocation);
-    mmap.write16(memLocation, --memValueAfter);
+    mmap.write(memLocation, --memValueAfter);
 
     // Reset all affected flags and set as necessary ones
     incdec8_flags(memValueAfter, true);
